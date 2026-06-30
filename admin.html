@@ -379,11 +379,22 @@ function toast(msg, err=false) {
   setTimeout(() => t.className='toast', 2500);
 }
 
+// ── READ HELPER ───────────────────────────────────────────────────────────────
+// Reads each top-level node separately instead of db.ref('/') — required because
+// Firebase rules are scoped per-node (root has no .read rule of its own).
+async function readAllNodes() {
+  const keys = ['so_data','product_data','cust_data','daily_data','meta','history',
+                '_so_mapping','_product_mapping','_hierarchy_mapping','_processed_lines'];
+  const snaps = await Promise.all(keys.map(k => db.ref('/'+k).once('value')));
+  const d = {};
+  keys.forEach((k,i) => { d[k] = snaps[i].val(); });
+  return d;
+}
+
 // ── LOAD ALL DATA ────────────────────────────────────────────────────────────
 async function loadAll() {
   try {
-    const snap = await db.ref('/').once('value');
-    const d = snap.val() || {};
+    const d = await readAllNodes() || {};
     document.getElementById('dbStatus').textContent = '● Connected';
     document.getElementById('dbStatus').style.color = 'var(--green)';
 
@@ -536,8 +547,8 @@ window.addDay = async function() {
 // ── SNAPSHOTS (safety net — auto-saved before any destructive or overwrite action) ──
 async function saveSnapshot(reason) {
   try {
-    const snap = await db.ref('/').once('value');
-    const d = snap.val() || {};
+    const snap = await readAllNodes();
+    const d = snap || {};
     const ts = Date.now();
     const entry = {
       ts,
@@ -839,8 +850,7 @@ window.processAndUpload = async function() {
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
     setProg(20);
 
-    const existingSnap = await db.ref('/').once('value');
-    const existing = existingSnap.val() || {};
+    const existing = await readAllNodes() || {};
     const processedLines = existing._processed_lines || {};
 
     const soMap={}, prodMap={}, custMap={}, dayMap={};
