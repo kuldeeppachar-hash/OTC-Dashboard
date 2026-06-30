@@ -668,19 +668,32 @@ window.processAndUpload = async function() {
     setProg(30);
 
     const STATE_ZONE={'HARYANA':'Delhi/NCR','DELHI':'Delhi/NCR','CHANDIGARH':'Delhi/NCR','RAJASTHAN':'Rajasthan','UTTAR PRADESH':'West UP & UK','UTTARAKHAND':'West UP & UK','PUNJAB':'Punjab'};
-    let newLineCount=0, skippedCount=0, newTotal=0, unmappedAmt=0, minDate=null, maxDate=null;
+    let newLineCount=0, skippedCount=0, newTotal=0, minDate=null, maxDate=null;
     const newFingerprints = {};
-    const unmappedCustomers = {};
+    const rejectedCustomers = {};
+    let rejectedCount = 0, rejectedAmt = 0;
 
     rows.forEach(r=>{
       const amt=parseFloat(r['Net Amount']||0); if(!amt) return;
+
+      const custCode = String(r['Customer Code']||'').trim();
+      const cust=String(r['Customer Name']||'').trim();
+
+      // REJECT rows whose customer isn't in the saved SO mapping — do this BEFORE
+      // marking as processed, so fixing the mapping and re-uploading later still works.
+      const partyInfo = partyLookup ? partyLookup[custCode] : null;
+      if (!partyInfo) {
+        rejectedCount++;
+        rejectedAmt += amt;
+        rejectedCustomers[cust] = (rejectedCustomers[cust]||0) + amt;
+        return; // excluded entirely — not added, not marked as processed
+      }
 
       // Build a unique fingerprint per row: date + customer code + product code + amount
       const rawDate = r['Invoice Date'];
       let dISO = '';
       let d = typeof rawDate==='number' ? new Date(Math.round((rawDate-25569)*86400*1000)) : new Date(rawDate);
       if (!isNaN(d)) dISO = d.toISOString().slice(0,10);
-      const custCode = String(r['Customer Code']||'').trim();
       const prodCode = String(r['Product Code']||'').trim();
       // Firebase RTDB keys cannot contain . $ # [ ] / or whitespace — sanitize before using as key
       const fingerprint = `${dISO}_${custCode}_${prodCode}_${amt}`.replace(/[.\$#\[\]\/\s]/g, '_');
@@ -693,20 +706,11 @@ window.processAndUpload = async function() {
 
       newLineCount++; newTotal+=amt;
       const prod=String(r['Product Description']||'').trim();
-      const cust=String(r['Customer Name']||'').trim();
       const state=String(r['State']||'').trim().toUpperCase();
-      const zone=STATE_ZONE[state]||'Other';
+      const soName = partyInfo.so;
+      const zone2 = partyInfo.zone;
 
       if(prod){ prodMap[prod]=(prodMap[prod]||0)+amt; }
-
-      const partyInfo = partyLookup ? partyLookup[custCode] : null;
-      const soName = partyInfo ? partyInfo.so : '';
-      const zone2 = partyInfo ? partyInfo.zone : zone;
-
-      if (!partyInfo) {
-        unmappedAmt += amt;
-        unmappedCustomers[cust] = (unmappedCustomers[cust]||0) + amt;
-      }
 
       if(cust){
         if(!custMap[cust]) custMap[cust]={name:cust,so:soName,zone:zone2,state:state.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()),amt:0};
@@ -769,13 +773,13 @@ window.processAndUpload = async function() {
     ]);
     setProg(100);
 
-    const unmappedNames = Object.keys(unmappedCustomers);
+    const rejectedNames = Object.keys(rejectedCustomers);
     const warnEl = document.getElementById('unmappedWarning');
-    if (unmappedNames.length > 0) {
-      const list = unmappedNames.map(n => `${n} (₹${(unmappedCustomers[n]/1000).toFixed(1)}K)`).join(', ');
+    if (rejectedNames.length > 0) {
+      const list = rejectedNames.map(n => `${n} (₹${(rejectedCustomers[n]/1000).toFixed(1)}K)`).join(', ');
       warnEl.style.display = 'block';
-      warnEl.innerHTML = `⚠ ${unmappedNames.length} customer(s) NOT in your SO mapping — added to totals but with NO SO assigned (₹${(unmappedAmt/100000).toFixed(2)}L unmapped):<br>${list}<br><br>Fix: add these to your Master Data Sheet and re-save the mapping, or accept they'll show as unassigned.`;
-      toast(`⚠ Added ${newLineCount} rows but ${unmappedNames.length} customers had NO SO match — see warning below`, true);
+      warnEl.innerHTML = `⚠ ${rejectedNames.length} customer(s) NOT in your SO mapping — EXCLUDED from upload entirely (₹${(rejectedAmt/100000).toFixed(2)}L rejected, not added to any totals):<br>${list}<br><br>To include them: add these to your Master Data Sheet, re-save the mapping, then re-upload this same file — rejected rows are not marked as processed, so they'll be picked up correctly next time.`;
+      toast(`✓ Added ${newLineCount} rows · ⚠ Rejected ${rejectedNames.length} unmapped customers (₹${(rejectedAmt/100000).toFixed(2)}L excluded)`, true);
     } else {
       warnEl.style.display = 'none';
       toast(`✓ Added ${newLineCount} new rows (₹${(newTotal/100000).toFixed(2)}L) · Skipped ${skippedCount} duplicates · All customers matched`);
