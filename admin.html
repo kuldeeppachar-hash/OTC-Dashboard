@@ -692,6 +692,7 @@ window.handlePartyFile = async function(file) {
       custLookup[code] = {
         so: String(r['SO Name']||'').trim(),
         zone: STATE_ZONE[state] || 'Other',
+        partyName: String(r['Party Name']||r['Party Name ']||'').trim(),
       };
     });
 
@@ -951,6 +952,11 @@ window.processAndUpload = async function() {
     const rejectedCustomers = {}, rejectedProducts = {};
     let rejectedCustAmt = 0, rejectedProdAmt = 0;
     const distinctCustomersInFile = new Set(), distinctProductsInFile = new Set();
+    const nameMismatches = {}; // code -> {sapName, partyName, amt}
+
+    function normalizeForCompare(s) {
+      return String(s||'').trim().toUpperCase().replace(/[^\w\s]/g,'').replace(/\s+/g,' ');
+    }
 
     rows.forEach(r=>{
       const amt=parseFloat(r['Net Amount']||0); if(!amt) return;
@@ -968,6 +974,18 @@ window.processAndUpload = async function() {
         rejectedCustAmt += amt;
         rejectedCustomers[cust] = (rejectedCustomers[cust]||0) + amt;
         return;
+      }
+
+      // FLAG (don't reject) when SAP's name for this code doesn't reasonably match
+      // the Party List's name for the same code — per your instruction, SAP is ground truth,
+      // so this is a master-data error to fix, not a reason to drop real sales.
+      const normSap = normalizeForCompare(cust);
+      const normParty = normalizeForCompare(partyInfo.partyName);
+      if (normSap && normParty && !normSap.includes(normParty) && !normParty.includes(normSap)) {
+        if (!nameMismatches[custCode]) {
+          nameMismatches[custCode] = { sapName: cust, partyName: partyInfo.partyName, assignedSO: partyInfo.so, amt: 0 };
+        }
+        nameMismatches[custCode].amt += amt;
       }
 
       // REJECT rows whose product isn't in the saved Product List (only if we have one to check against).
@@ -1017,7 +1035,7 @@ window.processAndUpload = async function() {
     window._pendingUpload = {
       soMap, prodMap, custMap, dayMap, processedLines, newFingerprints,
       newLineCount, skippedCount, newTotal, minDate, maxDate, existing,
-      rejectedCustomers, rejectedProducts, rejectedCustAmt, rejectedProdAmt
+      rejectedCustomers, rejectedProducts, rejectedCustAmt, rejectedProdAmt, nameMismatches
     };
 
     // ── Build preview ──────────────────────────────────────────────────────
@@ -1031,6 +1049,21 @@ window.processAndUpload = async function() {
       <div><b style="color:var(--green)">Will be added:</b> ${newLineCount} rows (₹${(newTotal/100000).toFixed(2)}L)</div>
       <div><b style="color:var(--text-dim)">Already uploaded before (skipped):</b> ${skippedCount} rows</div>
     `;
+
+    const mismatchCodes = Object.keys(nameMismatches);
+    if (mismatchCodes.length > 0) {
+      html += `<div style="margin-top:14px;padding:10px;background:rgba(248,113,113,0.12);border:1px solid var(--red);border-radius:8px;">
+        <div style="color:var(--red);font-weight:700">🚨 MASTER DATA ERROR — Customer name in SAP doesn't match your Party List for the SAME code:</div>`;
+      mismatchCodes.forEach(code => {
+        const m = nameMismatches[code];
+        html += `<div style="margin-top:8px;color:var(--text)">
+          Code <b>${code}</b> · ₹${(m.amt/1000).toFixed(1)}K<br>
+          &nbsp;&nbsp;SAP calls it: <b style="color:var(--amber)">"${m.sapName}"</b><br>
+          &nbsp;&nbsp;Your Party List calls it: <b style="color:var(--red)">"${m.partyName}"</b> → currently assigned to SO "${m.assignedSO}"
+        </div>`;
+      });
+      html += `<div style="margin-top:8px;color:var(--amber)">These rows will still be ADDED under SO "${mismatchCodes.map(c=>nameMismatches[c].assignedSO).join('/')}" since you said SAP's code is ground truth — but fix the NAME in your Party List for this code so it doesn't look wrong on the dashboard. Sales will appear under the SAP name, but if the SO assignment is also wrong, fix that in Party List too.</div></div>`;
+    }
     if (rejCustNames.length || rejProdNames.length) {
       html += `<div style="margin-top:10px;color:var(--red)"><b>⚠ Will be REJECTED — not in your master sheet (₹${(totalRejectedAmt/100000).toFixed(2)}L total):</b></div>`;
       if (rejCustNames.length) html += `<div style="margin-top:4px;color:var(--red)">Unknown customers (${rejCustNames.length}): ${rejCustNames.slice(0,15).join(', ')}${rejCustNames.length>15?` +${rejCustNames.length-15} more`:''}</div>`;
