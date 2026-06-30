@@ -153,6 +153,11 @@
         <button class="btn btn-cyan" id="saveMappingBtn" onclick="saveMappingToFirebase()" disabled>💾 SAVE MAPPING TO FIREBASE</button>
         <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);align-self:center">Saved once — reused automatically for every sales upload below. Both customer AND product codes are checked against this.</span>
       </div>
+      <div class="btn-row">
+        <button class="btn btn-amber" id="backfillBtn" onclick="backfillHierarchy()">🔄 RE-APPLY HIERARCHY TO EXISTING SO DATA</button>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);align-self:center">Use this if ASM/RSM/ZSM show "Unassigned" on the dashboard — stamps the saved hierarchy mapping onto SOs already in the database, without needing a new sales upload.</span>
+      </div>
+      <div id="backfillResult" style="display:none;margin-top:10px;font-family:var(--mono);font-size:11px;line-height:1.7;padding:10px 12px;border-radius:8px;"></div>
     </div>
   </div>
 
@@ -799,6 +804,82 @@ window.saveMappingToFirebase = async function() {
     toast('Error saving mapping: ' + e.message, true);
     btn.disabled = false;
     btn.textContent = '💾 SAVE MAPPING TO FIREBASE';
+  }
+};
+
+window.backfillHierarchy = async function() {
+  const btn = document.getElementById('backfillBtn');
+  const resultEl = document.getElementById('backfillResult');
+  btn.disabled = true;
+  btn.textContent = 'CHECKING...';
+  resultEl.style.display = 'none';
+  try {
+    const [hierSnap, soSnap] = await Promise.all([
+      db.ref('/_hierarchy_mapping').once('value'),
+      db.ref('/so_data').once('value'),
+    ]);
+    const hierLookup = hierSnap.val() || {};
+    const soNow = soSnap.val() || {};
+
+    if (!Object.keys(hierLookup).length) {
+      resultEl.style.display = 'block';
+      resultEl.style.background = 'rgba(251,191,36,0.1)';
+      resultEl.style.border = '1px solid rgba(251,191,36,0.35)';
+      resultEl.style.color = 'var(--amber)';
+      resultEl.innerHTML = '⚠ No hierarchy mapping saved yet. Upload your Master Data Sheet (must include a "Team List" sheet with ASM/RSM/ZSM/GM columns) and click "Save Mapping to Firebase" first, then run this again.';
+      btn.disabled = false;
+      btn.textContent = '🔄 RE-APPLY HIERARCHY TO EXISTING SO DATA';
+      return;
+    }
+
+    if (!Object.keys(soNow).length) {
+      resultEl.style.display = 'block';
+      resultEl.style.background = 'rgba(251,191,36,0.1)';
+      resultEl.style.border = '1px solid rgba(251,191,36,0.35)';
+      resultEl.style.color = 'var(--amber)';
+      resultEl.innerHTML = '⚠ No SO data exists yet — nothing to backfill. Upload a sales Excel first.';
+      btn.disabled = false;
+      btn.textContent = '🔄 RE-APPLY HIERARCHY TO EXISTING SO DATA';
+      return;
+    }
+
+    await saveSnapshot('Before hierarchy backfill');
+
+    let matched = 0;
+    const unmatched = [];
+    const updated = {};
+    Object.entries(soNow).forEach(([k, v]) => {
+      const h = hierLookup[v.name];
+      if (h) {
+        updated[k] = { ...v, asm: h.asm||'', rsm: h.rsm||'', zsm: h.zsm||'', gm: h.gm||'' };
+        matched++;
+      } else {
+        updated[k] = v;
+        unmatched.push(v.name);
+      }
+    });
+
+    await db.ref('/so_data').set(updated);
+
+    resultEl.style.display = 'block';
+    if (unmatched.length === 0) {
+      resultEl.style.background = 'rgba(74,222,128,0.1)';
+      resultEl.style.border = '1px solid rgba(74,222,128,0.35)';
+      resultEl.style.color = 'var(--green)';
+      resultEl.innerHTML = `✓ Hierarchy applied to all ${matched} SOs. Dashboard RSM/ZSM/ASM views are now populated — refresh dashboard.html to see it.`;
+    } else {
+      resultEl.style.background = 'rgba(248,113,113,0.1)';
+      resultEl.style.border = '1px solid rgba(248,113,113,0.35)';
+      resultEl.style.color = 'var(--red)';
+      resultEl.innerHTML = `✓ Matched ${matched} of ${matched+unmatched.length} SOs.<br>⚠ Could not match (will show "Unassigned"): ${unmatched.join(', ')}<br><span style="color:var(--text-dim)">These names exist in so_data but not in your Team List sheet — check spelling, or that they're marked Designation "SO" in Team List, then re-upload Master Data Sheet and run this again.</span>`;
+    }
+    toast(`✓ Backfill done — ${matched} matched, ${unmatched.length} unmatched (snapshot saved — restorable below)`);
+    loadAll();
+  } catch(e) {
+    toast(e.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🔄 RE-APPLY HIERARCHY TO EXISTING SO DATA';
   }
 };
 
