@@ -136,6 +136,61 @@
   /* ADMIN LINK BUTTON */
   .admin-link{background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:6px;text-decoration:none;letter-spacing:0.3px;transition:all 0.15s;}
   .admin-link:hover{border-color:var(--cyan);color:var(--cyan);}
+  /* ===== MOBILE RESPONSIVE ===== */
+  @media (max-width: 768px) {
+    body{font-size:12px;}
+    .header{height:auto;flex-wrap:wrap;padding:10px 14px;gap:8px;}
+    .header-left{flex-wrap:wrap;gap:8px;}
+    .logo-text{font-size:13px;}
+    .header-right{flex-wrap:wrap;gap:8px;width:100%;justify-content:flex-start;}
+    .live-pill{font-size:10px;padding:3px 8px;}
+    .header-date{font-size:10px;}
+    .admin-link{font-size:9px;padding:3px 8px;}
+
+    .filter-bar{padding:10px 14px;gap:8px;}
+    .filter-btn{font-size:11px;padding:5px 10px;}
+    .filter-bar > div[style*="margin-left:auto"]{margin-left:0!important;width:100%;flex-wrap:wrap;}
+    .export-btn{font-size:10px;padding:6px 12px;}
+
+    main{padding:14px;}
+
+    /* All multi-column grids collapse to single column on mobile */
+    .kpi-row{grid-template-columns:1fr 1fr;gap:10px;}
+    .grid-2, .grid-3, .grid-5-7, .grid-6-4{grid-template-columns:1fr!important;}
+    .zone-grid{grid-template-columns:1fr 1fr;gap:8px;}
+    .heat-grid{grid-template-columns:repeat(2,1fr)!important;}
+
+    .kpi-card{padding:14px;}
+    .kpi-value{font-size:20px;}
+    .kpi-label{font-size:9px;}
+    .kpi-sub{font-size:10px;}
+
+    .panel-header{padding:12px 14px;}
+    .panel-title{font-size:10px;}
+    .panel-body{padding:12px 14px;}
+
+    .zone-card{padding:10px;}
+    .zone-value{font-size:16px;}
+
+    .bar-row{grid-template-columns:80px 1fr 56px;gap:6px;}
+    .bar-name{font-size:10px;}
+    .bar-amount{font-size:10px;}
+
+    /* Tables scroll horizontally instead of squeezing/clipping */
+    .scroll-body{overflow-x:auto;}
+    .data-table{min-width:520px;}
+    .data-table th, .data-table td{padding:7px 8px;font-size:11px;}
+
+    svg.spark{height:130px!important;}
+    .trend-meta, #trendMeta{flex-wrap:wrap;gap:8px!important;}
+  }
+
+  @media (max-width: 420px) {
+    .kpi-row{grid-template-columns:1fr;}
+    .zone-grid{grid-template-columns:1fr;}
+    .heat-grid{grid-template-columns:1fr 1fr!important;}
+    .kpi-value{font-size:22px;}
+  }
 </style>
 </head>
 <body>
