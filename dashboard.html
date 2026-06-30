@@ -217,11 +217,15 @@
 
 <!-- FILTER BAR -->
 <div class="filter-bar">
-  <span class="filter-label">ZONE //</span>
-  <button class="filter-btn active" onclick="filterZone('All',this)">All Zones</button>
-  <button class="filter-btn" onclick="filterZone('Delhi/NCR',this)">Delhi / NCR</button>
-  <button class="filter-btn" onclick="filterZone('Rajasthan',this)">Rajasthan</button>
-  <button class="filter-btn" onclick="filterZone('West UP & UK',this)">West UP & UK</button>
+  <span class="filter-label">VIEW BY //</span>
+  <div id="viewByPills" style="display:flex;gap:8px">
+    <button class="filter-btn active" onclick="setViewBy('zone',this)">Zone</button>
+    <button class="filter-btn" onclick="setViewBy('rsm',this)">RSM</button>
+    <button class="filter-btn" onclick="setViewBy('zsm',this)">ZSM</button>
+  </div>
+  <span style="width:1px;height:18px;background:var(--border2);margin:0 2px"></span>
+  <span class="filter-label" id="pillsLabel">ZONE //</span>
+  <div id="filterPills" style="display:flex;gap:8px;flex-wrap:wrap"></div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
     <span class="chip" id="sapChip">Loading...</span>
     <button class="export-btn" onclick="exportToExcel()">
@@ -374,26 +378,38 @@ const db = firebase.database();
 
 // ===== GLOBAL STATE =====
 let soData = [], productData = [], custData = [], dailyData = [], meta = {};
-let currentZone = 'All';
+let currentZone = 'All';          // kept for export filename compatibility
+let currentViewBy = 'zone';       // 'zone' | 'rsm' | 'zsm'
+let currentFilterValue = 'All';
 const zoneColors = {"Delhi/NCR":"var(--green)","Rajasthan":"var(--amber)","West UP & UK":"var(--cyan)"};
 
-// ===== FIREBASE LISTENER =====
-db.ref('/').on('value', (snapshot) => {
-  const d = snapshot.val();
-  if (!d) { showError(); return; }
-
-  soData      = d.so_data      ? Object.values(d.so_data)      : [];
-  productData = d.product_data ? Object.values(d.product_data) : [];
-  custData    = d.cust_data    ? Object.values(d.cust_data)    : [];
-  dailyData   = d.daily_data   ? Object.values(d.daily_data)   : [];
-  meta        = d.meta         || {};
-
+// ===== FIREBASE LISTENERS =====
+// Per-node listeners — required because current security rules grant .read at
+// individual node paths (so_data, product_data, etc.), not at root. A single
+// db.ref('/').on(...) listener fails with permission_denied under those rules.
+const _loaded = { so_data:false, product_data:false, cust_data:false, daily_data:false, meta:false };
+let _firstLoadDone = false;
+function _onNodeUpdate() {
+  if (!Object.values(_loaded).every(Boolean)) return;
+  if (!_firstLoadDone && soData.length === 0 && custData.length === 0) {
+    showError();
+    return;
+  }
   renderAll();
-  hideLoading();
-}, (error) => {
-  console.error(error);
-  showError();
-});
+  if (!_firstLoadDone) { hideLoading(); _firstLoadDone = true; }
+}
+function _watch(node, assign) {
+  db.ref('/'+node).on('value', snap => {
+    assign(snap.val());
+    _loaded[node] = true;
+    _onNodeUpdate();
+  }, err => { console.error(node, err); showError(); });
+}
+_watch('so_data',      v => soData      = v ? Object.values(v) : []);
+_watch('product_data', v => productData = v ? Object.values(v) : []);
+_watch('cust_data',    v => custData    = v ? Object.values(v) : []);
+_watch('daily_data',   v => dailyData   = v ? Object.values(v) : []);
+_watch('meta',         v => meta        = v || {});
 
 function hideLoading() {
   const ol = document.getElementById('loadingOverlay');
@@ -413,7 +429,6 @@ function renderAll() {
   const topProd = [...productData].sort((a,b) => b.amt - a.amt)[0] || {};
 
   // KPIs
-  document.getElementById('kpiTotal').textContent = `₹${(totalAmt/100000).toFixed(2)}L`;
   document.getElementById('kpiSub1').textContent = `${custData.length} stockists · ${soData.length} SOs`;
   document.getElementById('kpiTopSO').textContent = `₹${((topSO.amt||0)/100000).toFixed(2)}L`;
   document.getElementById('kpiTopSOName').textContent = `${topSO.name||'—'} · ${topSO.zone||''}`;
@@ -430,10 +445,69 @@ function renderAll() {
   // Zone summary
   renderZones(totalAmt);
   renderDailyTrend();
-  renderSOBars('All');
+  rebuildFilterPills();
+  renderSOBars(currentFilterValue);
   renderStateBreakdown();
   renderHeatmap();
+  renderCustTable(currentFilterValue);
+  updateKpiTotal();
+}
+
+// ===== HIERARCHY LOOKUP (SO name → RSM/ZSM, set by admin.html's Team List mapping) =====
+function soHierarchyMap() {
+  const map = {};
+  soData.forEach(d => { map[d.name] = { rsm: d.rsm||'', zsm: d.zsm||'', asm: d.asm||'' }; });
+  return map;
+}
+
+// Grouping value for a record under the current View By dimension.
+// SO records carry rsm/zsm directly (written by admin.html on upload).
+// Stockist records don't — they're matched to their SO's hierarchy via the "so" name field.
+function groupValue(record, isStockist) {
+  if (currentViewBy === 'zone') return record.zone || 'Other';
+  if (isStockist) {
+    const h = soHierarchyMap()[record.so];
+    return (h && h[currentViewBy]) || 'Unassigned';
+  }
+  return record[currentViewBy] || 'Unassigned';
+}
+
+// ===== VIEW BY (Zone / RSM / ZSM) =====
+window.setViewBy = function(viewBy, btn) {
+  currentViewBy = viewBy;
+  currentFilterValue = 'All';
+  document.querySelectorAll('#viewByPills .filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  rebuildFilterPills();
+  renderSOBars('All');
   renderCustTable('All');
+  updateKpiTotal();
+};
+
+function rebuildFilterPills() {
+  document.getElementById('pillsLabel').textContent = currentViewBy.toUpperCase() + ' //';
+  const values = [...new Set(soData.map(d => d[currentViewBy] || 'Unassigned'))].sort();
+  if (!values.includes(currentFilterValue)) currentFilterValue = 'All';
+  const wrap = document.getElementById('filterPills');
+  const esc = v => String(v).replace(/'/g, "\\'");
+  wrap.innerHTML = `<button class="filter-btn${currentFilterValue==='All'?' active':''}" onclick="filterPill('All',this)">All</button>` +
+    values.map(v => `<button class="filter-btn${v===currentFilterValue?' active':''}" onclick="filterPill('${esc(v)}',this)">${v}</button>`).join('');
+}
+
+window.filterPill = function(value, btn) {
+  currentFilterValue = value;
+  currentZone = value; // kept in sync for export filename
+  document.querySelectorAll('#filterPills .filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderSOBars(value);
+  renderCustTable(value);
+  updateKpiTotal();
+};
+
+function updateKpiTotal() {
+  const filtered = currentFilterValue === 'All' ? soData : soData.filter(d => groupValue(d,false) === currentFilterValue);
+  const t = filtered.reduce((s,d) => s + d.amt, 0);
+  document.getElementById('kpiTotal').textContent = `₹${(t/100000).toFixed(2)}L`;
 }
 
 // ===== ZONE CONTRIBUTION =====
@@ -560,15 +634,15 @@ function renderDailyTrend() {
 }
 
 // ===== SO BARS =====
-function renderSOBars(zone) {
+function renderSOBars(value) {
   const container = document.getElementById('soBarChart');
-  const filtered = zone === 'All' ? soData : soData.filter(d => d.zone === zone);
+  const filtered = value === 'All' ? soData : soData.filter(d => groupValue(d,false) === value);
   const sorted = [...filtered].sort((a,b) => b.amt - a.amt);
   const maxAmt = sorted[0]?.amt || 1;
   container.innerHTML = '';
   sorted.forEach(d => {
     const pct = (d.amt / maxAmt * 100).toFixed(1);
-    const color = zoneColors[d.zone] || 'var(--cyan)';
+    const color = zoneColors[d.zone] || 'var(--cyan)'; // always color by zone for visual consistency
     const row = document.createElement('div');
     row.className = 'bar-row';
     row.innerHTML = `
@@ -638,9 +712,9 @@ function renderHeatmap() {
 }
 
 // ===== CUSTOMER TABLE =====
-function renderCustTable(zone) {
+function renderCustTable(value) {
   const tbody = document.getElementById('custTbody');
-  const filtered = zone === 'All' ? custData : custData.filter(d => d.zone === zone);
+  const filtered = value === 'All' ? custData : custData.filter(d => groupValue(d,true) === value);
   const sorted = [...filtered].sort((a,b) => b.amt - a.amt);
   const totalAmt = custData.reduce((s,d) => s + d.amt, 0);
   tbody.innerHTML = '';
@@ -660,19 +734,6 @@ function renderCustTable(zone) {
     tbody.appendChild(tr);
   });
 }
-
-// ===== ZONE FILTER =====
-window.filterZone = function(zone, btn) {
-  currentZone = zone;
-  document.querySelectorAll('.filter-bar .filter-btn').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  renderSOBars(zone);
-  renderCustTable(zone);
-
-  const filtered = zone === 'All' ? soData : soData.filter(d => d.zone === zone);
-  const t = filtered.reduce((s,d) => s + d.amt, 0);
-  document.getElementById('kpiTotal').textContent = `₹${(t/100000).toFixed(2)}L`;
-};
 
 // ===== CLOCK =====
 function updateClock() {
@@ -717,7 +778,7 @@ window.exportToExcel = function() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dRows), 'Daily Trend');
   }
 
-  const filename = `PIL_OTC_${currentZone.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  const filename = `PIL_OTC_${currentViewBy}_${currentFilterValue.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
   XLSX.writeFile(wb, filename);
   const toast = document.getElementById('exportToast');
   toast.textContent = `✓ Exported: ${filename}`;
