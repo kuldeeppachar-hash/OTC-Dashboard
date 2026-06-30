@@ -537,8 +537,9 @@ function renderDailyTrend() {
     const isEdge = i === peakIdx || i === dipIdx;
     const color = i === peakIdx ? 'var(--amber)' : i === dipIdx ? 'var(--red)' : 'var(--cyan)';
     svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isEdge?4.5:3.5}" fill="${color}" ${isEdge?'stroke="var(--bg)" stroke-width="1.5"':''}/>`;
-    // Date label
-    const label = sorted[i].date ? String(sorted[i].date).slice(-5).replace('-','') : i+1;
+    // Date label — format is "08-Jun-2026", show "08-Jun" (day-month), not the year
+    const dateParts = sorted[i].date ? String(sorted[i].date).split('-') : null;
+    const label = dateParts && dateParts.length >= 2 ? `${dateParts[0]}-${dateParts[1]}` : (i+1);
     svg += `<text x="${p.x.toFixed(1)}" y="${H+12}" text-anchor="middle" fill="${isEdge?color:'var(--text-dim)'}" font-size="7.5" font-family="JetBrains Mono">${label}</text>`;
   });
 
