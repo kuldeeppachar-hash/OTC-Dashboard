@@ -680,7 +680,8 @@ window.processAndUpload = async function() {
       if (!isNaN(d)) dISO = d.toISOString().slice(0,10);
       const custCode = String(r['Customer Code']||'').trim();
       const prodCode = String(r['Product Code']||'').trim();
-      const fingerprint = `${dISO}|${custCode}|${prodCode}|${amt}`;
+      // Firebase RTDB keys cannot contain . $ # [ ] / or whitespace — sanitize before using as key
+      const fingerprint = `${dISO}_${custCode}_${prodCode}_${amt}`.replace(/[.\$#\[\]\/\s]/g, '_');
 
       if (processedLines[fingerprint] || newFingerprints[fingerprint]) {
         skippedCount++;
