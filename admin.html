@@ -299,8 +299,19 @@
 
   </div>
 
+  <!-- SNAPSHOT HISTORY / RESTORE -->
+  <div class="panel" style="margin-top:16px">
+    <div class="panel-header">
+      <div class="panel-title"><div class="dot" style="background:var(--green)"></div>Snapshot History — Undo / Restore</div>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">Auto-saved before every upload, delete, or clear · last 15 kept</span>
+    </div>
+    <div class="panel-body">
+      <div class="item-list" id="historyList" style="max-height:220px"></div>
+    </div>
+  </div>
+
   <!-- META -->
-  <div class="panel" style="margin-top:4px">
+  <div class="panel" style="margin-top:16px">
     <div class="panel-header">
       <div class="panel-title"><div class="dot" style="background:var(--text-mid)"></div>Dashboard Meta Info</div>
     </div>
@@ -394,6 +405,7 @@ async function loadAll() {
     renderProdList(prod);
     renderCustList(cust);
     renderDayList(day);
+    renderHistoryList(d.history);
 
     // Meta
     document.getElementById('metaTag').value    = meta.period_tag||'';
@@ -427,7 +439,7 @@ function renderSOList(entries) {
       <span class="item-name">${v.name}</span>
       <span class="item-zone ${zoneClass(v.zone)}">${v.zone}</span>
       <span class="item-amt">₹${(v.amt/1000).toFixed(1)}K</span>
-      <button class="del-btn" onclick="delEntry('so_data','${k}')">✕</button>
+      <button class="del-btn" onclick="delEntry('so_data','${k}','${(v.name||'').replace(/'/g,"\\'")}')">✕</button>
     </div>`).join('');
 }
 function renderProdList(entries) {
@@ -437,7 +449,7 @@ function renderProdList(entries) {
     <div class="item-row">
       <span class="item-name">${v.name}</span>
       <span class="item-amt">₹${(v.amt/1000).toFixed(1)}K</span>
-      <button class="del-btn" onclick="delEntry('product_data','${k}')">✕</button>
+      <button class="del-btn" onclick="delEntry('product_data','${k}','${(v.name||'').replace(/'/g,"\\'")}')">✕</button>
     </div>`).join('');
 }
 function renderCustList(entries) {
@@ -448,7 +460,7 @@ function renderCustList(entries) {
       <span class="item-name">${v.name}</span>
       <span class="item-zone ${zoneClass(v.zone)}">${v.zone}</span>
       <span class="item-amt">₹${(v.amt/1000).toFixed(1)}K</span>
-      <button class="del-btn" onclick="delEntry('cust_data','${k}')">✕</button>
+      <button class="del-btn" onclick="delEntry('cust_data','${k}','${(v.name||'').replace(/'/g,"\\'")}')">✕</button>
     </div>`).join('');
 }
 function renderDayList(entries) {
@@ -458,7 +470,7 @@ function renderDayList(entries) {
     <div class="item-row">
       <span class="item-name">${v.date}</span>
       <span class="item-amt">₹${(v.amt/1000).toFixed(1)}K</span>
-      <button class="del-btn" onclick="delEntry('daily_data','${k}')">✕</button>
+      <button class="del-btn" onclick="delEntry('daily_data','${k}','${v.date}')">✕</button>
     </div>`).join('');
 }
 
@@ -521,19 +533,85 @@ window.addDay = async function() {
   } catch(e){ toast(e.message,true); }
 };
 
-window.delEntry = async function(path, key) {
+// ── SNAPSHOTS (safety net — auto-saved before any destructive or overwrite action) ──
+async function saveSnapshot(reason) {
   try {
+    const snap = await db.ref('/').once('value');
+    const d = snap.val() || {};
+    const ts = Date.now();
+    const entry = {
+      ts,
+      label: new Date(ts).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),
+      reason: reason || 'Manual',
+      so_data: d.so_data || null,
+      product_data: d.product_data || null,
+      cust_data: d.cust_data || null,
+      daily_data: d.daily_data || null,
+      meta: d.meta || null,
+    };
+    await db.ref('/history/'+ts).set(entry);
+    // keep only the last 15 snapshots so the DB doesn't grow forever
+    const histSnap = await db.ref('/history').orderByKey().once('value');
+    const keys = [];
+    histSnap.forEach(c => keys.push(c.key));
+    if (keys.length > 15) {
+      const toDelete = keys.slice(0, keys.length - 15);
+      await Promise.all(toDelete.map(k => db.ref('/history/'+k).remove()));
+    }
+  } catch(e) { console.error('snapshot failed (non-fatal):', e); }
+}
+
+window.restoreSnapshot = async function(ts, label) {
+  if (!confirm(`Restore the snapshot from ${label}?\n\nThis will OVERWRITE your current SO/Stockist/Product/Daily/Meta data with that older version.\n\nYour CURRENT data will itself be saved as a snapshot first, so this restore can also be undone. Continue?`)) return;
+  try {
+    await saveSnapshot('Auto-save before restoring "'+label+'"');
+    const snap = await db.ref('/history/'+ts).once('value');
+    const h = snap.val();
+    if (!h) { toast('Snapshot not found', true); return; }
+    await Promise.all([
+      db.ref('/so_data').set(h.so_data||null),
+      db.ref('/product_data').set(h.product_data||null),
+      db.ref('/cust_data').set(h.cust_data||null),
+      db.ref('/daily_data').set(h.daily_data||null),
+      db.ref('/meta').set(h.meta||null),
+    ]);
+    toast('✓ Restored snapshot from '+h.label);
+    loadAll();
+  } catch(e){ toast(e.message, true); }
+};
+
+function renderHistoryList(history) {
+  const el = document.getElementById('historyList');
+  if (!el) return;
+  const entries = Object.entries(history||{}).sort((a,b)=>b[1].ts-a[1].ts);
+  if (!entries.length) {
+    el.innerHTML = '<div style="padding:10px 0;color:var(--text-dim);font-family:var(--mono);font-size:11px">No snapshots yet — one is saved automatically every time you upload, delete, or clear data. Check back after your next action.</div>';
+    return;
+  }
+  el.innerHTML = entries.map(([k,v])=>`
+    <div class="item-row">
+      <div class="item-name">${v.label} <span style="color:var(--text-dim)">— ${v.reason||''}</span></div>
+      <button class="btn btn-cyan" style="padding:4px 10px;font-size:10px" onclick="restoreSnapshot('${k}','${v.label}')">⟲ RESTORE</button>
+    </div>
+  `).join('');
+}
+
+window.delEntry = async function(path, key, displayName) {
+  if (!confirm(`Delete "${displayName||'this entry'}"?\n\nA snapshot of current data will be saved first, so this can be undone from the Snapshot History panel below.`)) return;
+  try {
+    await saveSnapshot('Before deleting one entry from '+path);
     await db.ref(`/${path}/${key}`).remove();
-    toast('✓ Deleted');
+    toast('✓ Deleted (snapshot saved — restorable below)');
     loadAll();
   } catch(e){ toast(e.message,true); }
 };
 
 window.clearAll = async function(path, label) {
-  if (!confirm(`Delete ALL ${label} data from Firebase? This cannot be undone.`)) return;
+  if (!confirm(`Delete ALL ${label} data from Firebase?\n\nA snapshot of current data will be saved first, so this can be undone from the Snapshot History panel below.`)) return;
   try {
+    await saveSnapshot('Before clearing all '+label+' data');
     await db.ref('/'+path).remove();
-    toast(`✓ All ${label} data cleared`);
+    toast(`✓ All ${label} data cleared (snapshot saved — restorable below)`);
     if (confirm(`Also reset Upload History now?\n\nIf you don't, your next sales upload will think these rows were "already processed" and skip everything — even though the data is now gone. You'll see "0 new rows" and the dashboard will stay empty.\n\nClick OK to reset history now (recommended), or Cancel if you're only clearing this one panel and plan to keep other data intact.`)) {
       await db.ref('/_processed_lines').remove();
       toast('✓ Upload History also reset — next upload will process fresh');
@@ -940,6 +1018,8 @@ window.confirmUpload = async function() {
       sap_info:`SAP Lines: ${Object.keys(updatedProcessedLines).length} · ₹${(grandTotal/100000).toFixed(2)}L`,
     };
 
+    setProg(70);
+    await saveSnapshot('Before sales upload — '+p.newLineCount+' new rows');
     setProg(80);
     await Promise.all([
       db.ref('/so_data').set(so_data),
