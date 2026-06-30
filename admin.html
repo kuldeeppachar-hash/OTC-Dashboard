@@ -400,11 +400,12 @@ async function loadAll() {
     document.getElementById('metaPeriod').value = meta.period||'';
     document.getElementById('metaSap').value    = meta.sap_info||'';
 
-    // SO + Product Mapping status
+    // SO + Product + Hierarchy Mapping status
     const custMapping = d._so_mapping;
     const prodMapping = d._product_mapping;
+    const hierMapping = d._hierarchy_mapping;
     if (custMapping && Object.keys(custMapping).length) {
-      updateMappingStatus(Object.keys(custMapping).length, prodMapping ? Object.keys(prodMapping).length : 0);
+      updateMappingStatus(Object.keys(custMapping).length, prodMapping ? Object.keys(prodMapping).length : 0, hierMapping ? Object.keys(hierMapping).length : 0);
     } else {
       document.getElementById('mappingStatus').textContent = '⚠ No mapping saved — sales upload will be blocked until you save one';
       document.getElementById('mappingStatus').style.color = 'var(--amber)';
@@ -533,6 +534,10 @@ window.clearAll = async function(path, label) {
   try {
     await db.ref('/'+path).remove();
     toast(`✓ All ${label} data cleared`);
+    if (confirm(`Also reset Upload History now?\n\nIf you don't, your next sales upload will think these rows were "already processed" and skip everything — even though the data is now gone. You'll see "0 new rows" and the dashboard will stay empty.\n\nClick OK to reset history now (recommended), or Cancel if you're only clearing this one panel and plan to keep other data intact.`)) {
+      await db.ref('/_processed_lines').remove();
+      toast('✓ Upload History also reset — next upload will process fresh');
+    }
     loadAll();
   } catch(e){ toast(e.message,true); }
 };
@@ -613,9 +618,74 @@ window.handlePartyFile = async function(file) {
       toast('⚠ No "Product List" sheet found — product-code checking will be skipped', true);
     }
 
-    window._pendingMapping = { customers: custLookup, products: prodLookup };
+    // ── Team List → ASM/RSM/ZSM/GM hierarchy ──────────────────────────────
+    // Real names live in Team List; Party List SO names are looser/inconsistently spelled,
+    // so we match Party List SO names → Team List authentic names using normalization + known aliases.
+    const teamSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('team'));
+    const hierarchyLookup = {}; // keyed by Party List SO name (as used in so_data) -> {realName, asm, rsm, zsm, gm}
+    const unmatchedSOs = [];
+
+    function normalize(name) {
+      if (!name) return '';
+      return String(name).trim().toUpperCase().replace(/[^\w\s]/g,'').replace(/\s+/g,' ');
+    }
+
+    const KNOWN_ALIASES = {
+      'MOHAMMAD ASIF':'MOHAMMED ASIF', 'SHAHBAZ KHAN':'SHAHBAJ KHAN',
+      'DHANRAJ':'DHAN RAJ', 'BHURARAM':'BHURA RAM', 'ASRSHDEEP SINGH':'ARSHDEEP SINGH SONI',
+    };
+
+    if (teamSheetName) {
+      const teamRows = XLSX.utils.sheet_to_json(wb.Sheets[teamSheetName]);
+      const soRows = teamRows.filter(r => String(r['Designation']||'').trim()==='SO');
+      const teamByNorm = {}, teamByFirstWord = {};
+      soRows.forEach(r => {
+        const norm = normalize(r['Name']);
+        const fw = norm.split(' ')[0];
+        teamByNorm[norm] = r;
+        if (!teamByFirstWord[fw]) teamByFirstWord[fw] = [];
+        teamByFirstWord[fw].push(r);
+      });
+
+      // Match each distinct Party List SO name to a Team List record
+      const distinctSONames = [...new Set(Object.values(custLookup).map(v=>v.so).filter(Boolean))];
+      distinctSONames.forEach(soName => {
+        const norm = normalize(soName);
+        if (norm === 'VACANT' || !norm) return;
+        let teamRecord = null;
+
+        if (KNOWN_ALIASES[norm] && teamByNorm[KNOWN_ALIASES[norm]]) {
+          teamRecord = teamByNorm[KNOWN_ALIASES[norm]];
+        } else if (teamByNorm[norm]) {
+          teamRecord = teamByNorm[norm];
+        } else {
+          const fw = norm.split(' ')[0];
+          if (teamByFirstWord[fw] && teamByFirstWord[fw].length === 1) {
+            teamRecord = teamByFirstWord[fw][0];
+          }
+        }
+
+        if (teamRecord) {
+          hierarchyLookup[soName] = {
+            realName: String(teamRecord['Name']||'').trim(),
+            asm: String(teamRecord['ASM']||'').trim(),
+            rsm: String(teamRecord['RSM']||'').trim(),
+            zsm: String(teamRecord['ZSM']||'').trim(),
+            gm:  String(teamRecord['GM']||'').trim(),
+          };
+        } else {
+          unmatchedSOs.push(soName);
+        }
+      });
+    }
+
+    if (unmatchedSOs.length > 0) {
+      toast(`⚠ Could not match hierarchy for: ${unmatchedSOs.join(', ')} — they'll show "Unassigned"`, true);
+    }
+
+    window._pendingMapping = { customers: custLookup, products: prodLookup, hierarchy: hierarchyLookup };
     document.getElementById('saveMappingBtn').disabled = false;
-    toast(`✓ Read: ${Object.keys(custLookup).length} customers, ${Object.keys(prodLookup).length} products — click "Save Mapping" to store it`);
+    toast(`✓ Read: ${Object.keys(custLookup).length} customers, ${Object.keys(prodLookup).length} products, ${Object.keys(hierarchyLookup).length} SO hierarchies — click "Save Mapping" to store it`);
   } catch(e) {
     toast('Master data error: ' + e.message, true);
   }
@@ -629,11 +699,13 @@ window.saveMappingToFirebase = async function() {
   try {
     await db.ref('/_so_mapping').set(window._pendingMapping.customers);
     await db.ref('/_product_mapping').set(window._pendingMapping.products);
+    await db.ref('/_hierarchy_mapping').set(window._pendingMapping.hierarchy || {});
     const custCount = Object.keys(window._pendingMapping.customers).length;
     const prodCount = Object.keys(window._pendingMapping.products).length;
-    toast(`✓ Saved: ${custCount} customers, ${prodCount} products — used for all future sales uploads`);
+    const hierCount = Object.keys(window._pendingMapping.hierarchy || {}).length;
+    toast(`✓ Saved: ${custCount} customers, ${prodCount} products, ${hierCount} hierarchies — used for all future sales uploads`);
     btn.textContent = '✓ SAVED';
-    updateMappingStatus(custCount, prodCount);
+    updateMappingStatus(custCount, prodCount, hierCount);
   } catch(e) {
     toast('Error saving mapping: ' + e.message, true);
     btn.disabled = false;
@@ -641,8 +713,8 @@ window.saveMappingToFirebase = async function() {
   }
 };
 
-function updateMappingStatus(custCount, prodCount) {
-  document.getElementById('mappingStatus').textContent = `✓ ${custCount} customers, ${prodCount} products saved`;
+function updateMappingStatus(custCount, prodCount, hierCount) {
+  document.getElementById('mappingStatus').textContent = `✓ ${custCount} customers, ${prodCount} products, ${hierCount||0} hierarchies saved`;
   document.getElementById('mappingStatus').style.color = 'var(--green)';
 }
 
@@ -839,8 +911,16 @@ window.confirmUpload = async function() {
       return;
     }
 
+    const hierSnap = await db.ref('/_hierarchy_mapping').once('value');
+    const hierLookup = hierSnap.val() || {};
+
     const so_data={}, product_data={}, cust_data={}, daily_data={};
-    Object.entries(p.soMap).forEach(([,v],i)=>{ v.amt=Math.round(v.amt*100)/100; so_data[`so_${i}`]=v; });
+    Object.entries(p.soMap).forEach(([,v],i)=>{
+      v.amt=Math.round(v.amt*100)/100;
+      const h = hierLookup[v.name];
+      if (h) { v.asm=h.asm||''; v.rsm=h.rsm||''; v.zsm=h.zsm||''; v.gm=h.gm||''; }
+      so_data[`so_${i}`]=v;
+    });
     Object.entries(p.prodMap).forEach(([name,amt],i)=>{product_data[`prod_${i}`]={name,amt:Math.round(amt*100)/100};});
     Object.entries(p.custMap).forEach(([,v],i)=>{v.amt=Math.round(v.amt*100)/100;cust_data[`cust_${i}`]=v;});
     Object.entries(p.dayMap).sort().forEach(([key,amt],i)=>{
