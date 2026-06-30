@@ -139,19 +139,32 @@
 
   <div class="panel" style="margin-bottom:16px">
     <div class="panel-header">
-      <div class="panel-title"><div class="dot" style="background:var(--cyan)"></div>Master Data Sheet (Party List)</div>
+      <div class="panel-title"><div class="dot" style="background:var(--cyan)"></div>Master Data Sheet (Party List + Product List)</div>
       <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="mappingStatus">No mapping saved yet</span>
     </div>
     <div class="panel-body">
       <div class="upload-zone" id="dropZonePartyList" onclick="document.getElementById('partyFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDropParty(event)">
         <input type="file" id="partyFile" accept=".xlsx,.xls" onchange="handlePartyFile(this.files[0])" style="display:none">
-        📁 Drop Master Data Sheet (Party List with SO Name) here<br>
-        <span style="color:var(--text-dim);font-size:10px">Needs sheet "Party List" with columns: SAP Code, SO Name, State</span>
+        📁 Drop Master Data Sheet here (must contain "Party List" and "Product List" sheets)<br>
+        <span style="color:var(--text-dim);font-size:10px">Party List needs: SAP Code, SO Name, State · Product List needs: Item Code</span>
         <div style="color:var(--green);margin-top:6px;font-size:11px" id="partyFileName"></div>
       </div>
       <div class="btn-row">
         <button class="btn btn-cyan" id="saveMappingBtn" onclick="saveMappingToFirebase()" disabled>💾 SAVE MAPPING TO FIREBASE</button>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);align-self:center">Saved once — reused automatically for every sales upload below</span>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);align-self:center">Saved once — reused automatically for every sales upload below. Both customer AND product codes are checked against this.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- UPLOAD PREVIEW / CONFIRM MODAL -->
+  <div id="previewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9998;align-items:center;justify-content:center;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
+      <h3 style="color:var(--amber);font-size:15px;margin-bottom:6px;font-family:var(--mono)">⚠ Confirm This Upload</h3>
+      <p style="color:var(--text-dim);font-size:11px;font-family:var(--mono);margin-bottom:16px">Check this is the right file before it touches your live dashboard.</p>
+      <div id="previewContent" style="font-family:var(--mono);font-size:11px;color:var(--text-mid);line-height:1.8;"></div>
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button class="btn btn-green" onclick="confirmUpload()" style="flex:1">✓ YES, THIS IS CORRECT — UPLOAD</button>
+        <button class="btn btn-red" onclick="cancelUpload()" style="flex:1">✕ CANCEL</button>
       </div>
     </div>
   </div>
@@ -387,10 +400,11 @@ async function loadAll() {
     document.getElementById('metaPeriod').value = meta.period||'';
     document.getElementById('metaSap').value    = meta.sap_info||'';
 
-    // SO Mapping status
-    const mapping = d._so_mapping;
-    if (mapping && Object.keys(mapping).length) {
-      updateMappingStatus(Object.keys(mapping).length);
+    // SO + Product Mapping status
+    const custMapping = d._so_mapping;
+    const prodMapping = d._product_mapping;
+    if (custMapping && Object.keys(custMapping).length) {
+      updateMappingStatus(Object.keys(custMapping).length, prodMapping ? Object.keys(prodMapping).length : 0);
     } else {
       document.getElementById('mappingStatus').textContent = '⚠ No mapping saved — sales upload will be blocked until you save one';
       document.getElementById('mappingStatus').style.color = 'var(--amber)';
@@ -559,31 +573,51 @@ window.handleDropParty = function(e) {
 window.handlePartyFile = async function(file) {
   if (!file) return;
   document.getElementById('partyFileName').textContent = '📄 ' + file.name;
-  toast('Reading Party List...');
+  toast('Reading Master Data Sheet...');
   try {
     if (!window.XLSX) {
       await new Promise(r=>{ const s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';s.onload=r;document.head.appendChild(s); });
     }
     const buf = await file.arrayBuffer();
     const wb  = XLSX.read(buf);
-    const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('party')) || wb.SheetNames[0];
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+
+    // ── Party List → customer/SO mapping ──────────────────────────────────
+    const partySheetName = wb.SheetNames.find(n => n.toLowerCase().includes('party')) || wb.SheetNames[0];
+    const partyRows = XLSX.utils.sheet_to_json(wb.Sheets[partySheetName]);
     const STATE_ZONE={'HARYANA':'Delhi/NCR','DELHI':'Delhi/NCR','CHANDIGARH':'Delhi/NCR','RAJASTHAN':'Rajasthan','UTTAR PRADESH':'West UP & UK','UTTARAKHAND':'West UP & UK','PUNJAB':'Punjab'};
-    const lookup = {};
-    rows.forEach(r => {
+    const custLookup = {};
+    partyRows.forEach(r => {
       const code = String(parseInt(r['SAP Code'])||'').trim();
       if (!code || code==='NaN') return;
       const state = String(r['State']||'').trim().toUpperCase();
-      lookup[code] = {
+      custLookup[code] = {
         so: String(r['SO Name']||'').trim(),
         zone: STATE_ZONE[state] || 'Other',
       };
     });
-    window._pendingMapping = lookup;
+
+    // ── Product List → valid product codes ──────────────────────────────────
+    // Note: this sheet's real headers are on the SECOND row (row index 1), not the first.
+    const prodSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('product'));
+    const prodLookup = {};
+    if (prodSheetName) {
+      const prodRows = XLSX.utils.sheet_to_json(wb.Sheets[prodSheetName], {range: 1});
+      prodRows.forEach(r => {
+        const code = String(parseInt(r['Item Code'])||'').trim();
+        if (!code || code==='NaN') return;
+        prodLookup[code] = String(r['Product Name']||'').trim();
+      });
+    }
+
+    if (!prodSheetName || Object.keys(prodLookup).length === 0) {
+      toast('⚠ No "Product List" sheet found — product-code checking will be skipped', true);
+    }
+
+    window._pendingMapping = { customers: custLookup, products: prodLookup };
     document.getElementById('saveMappingBtn').disabled = false;
-    toast(`✓ Party List read: ${Object.keys(lookup).length} mappings — click "Save Mapping" to store it`);
+    toast(`✓ Read: ${Object.keys(custLookup).length} customers, ${Object.keys(prodLookup).length} products — click "Save Mapping" to store it`);
   } catch(e) {
-    toast('Party list error: ' + e.message, true);
+    toast('Master data error: ' + e.message, true);
   }
 };
 
@@ -593,10 +627,13 @@ window.saveMappingToFirebase = async function() {
   btn.disabled = true;
   btn.textContent = 'SAVING...';
   try {
-    await db.ref('/_so_mapping').set(window._pendingMapping);
-    toast(`✓ SO mapping saved (${Object.keys(window._pendingMapping).length} customers) — used automatically for all future sales uploads`);
+    await db.ref('/_so_mapping').set(window._pendingMapping.customers);
+    await db.ref('/_product_mapping').set(window._pendingMapping.products);
+    const custCount = Object.keys(window._pendingMapping.customers).length;
+    const prodCount = Object.keys(window._pendingMapping.products).length;
+    toast(`✓ Saved: ${custCount} customers, ${prodCount} products — used for all future sales uploads`);
     btn.textContent = '✓ SAVED';
-    updateMappingStatus(Object.keys(window._pendingMapping).length);
+    updateMappingStatus(custCount, prodCount);
   } catch(e) {
     toast('Error saving mapping: ' + e.message, true);
     btn.disabled = false;
@@ -604,8 +641,8 @@ window.saveMappingToFirebase = async function() {
   }
 };
 
-function updateMappingStatus(count) {
-  document.getElementById('mappingStatus').textContent = `✓ ${count} customer mappings saved`;
+function updateMappingStatus(custCount, prodCount) {
+  document.getElementById('mappingStatus').textContent = `✓ ${custCount} customers, ${prodCount} products saved`;
   document.getElementById('mappingStatus').style.color = 'var(--green)';
 }
 
@@ -616,29 +653,33 @@ window.handleXlFile = function(file) {
   window._xlFile = file;
 };
 
+// STEP 1: Analyze the file, show a preview, wait for explicit confirmation before writing anything.
 window.processAndUpload = async function() {
   const file = window._xlFile;
   if (!file) return;
 
-  // Load saved SO mapping from Firebase (no need to re-drop Party List each time)
-  let partyLookup;
+  let custLookup, prodLookup;
   try {
-    const mapSnap = await db.ref('/_so_mapping').once('value');
-    partyLookup = mapSnap.val();
+    const custSnap = await db.ref('/_so_mapping').once('value');
+    const prodSnap = await db.ref('/_product_mapping').once('value');
+    custLookup = custSnap.val();
+    prodLookup = prodSnap.val();
   } catch(e) {
-    toast('Could not load saved SO mapping: ' + e.message, true);
+    toast('Could not load saved mapping: ' + e.message, true);
     return;
   }
-  if (!partyLookup) {
-    toast('No SO mapping saved yet — upload Master Data Sheet above first (one-time setup)', true);
+  if (!custLookup) {
+    toast('No mapping saved yet — upload Master Data Sheet above first (one-time setup)', true);
     return;
   }
+  const hasProdCheck = prodLookup && Object.keys(prodLookup).length > 0;
 
   const btn = document.getElementById('xlUpBtn');
   btn.disabled = true;
-  btn.textContent = 'PROCESSING...';
+  btn.textContent = 'ANALYZING...';
   const setProg = p => document.getElementById('xlProg').style.width = p+'%';
   setProg(5);
+
   try {
     if (!window.XLSX) {
       await new Promise(r=>{ const s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';s.onload=r;document.head.appendChild(s); });
@@ -646,83 +687,82 @@ window.processAndUpload = async function() {
     const buf  = await file.arrayBuffer();
     const wb   = XLSX.read(buf);
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-    setProg(15);
-    toast(`Loaded ${rows.length} rows from file…`);
+    setProg(20);
 
-    // ── FETCH EXISTING DATA FIRST (for additive merge) ─────────────────────
     const existingSnap = await db.ref('/').once('value');
     const existing = existingSnap.val() || {};
     const processedLines = existing._processed_lines || {};
 
-    // Rebuild working maps FROM existing Firebase data (so we add to it, not replace it)
     const soMap={}, prodMap={}, custMap={}, dayMap={};
     Object.values(existing.so_data||{}).forEach(v=>{ soMap[v.name+'|'+v.zone]={name:v.name,zone:v.zone,amt:v.amt}; });
     Object.values(existing.product_data||{}).forEach(v=>{ prodMap[v.name]=v.amt; });
     Object.values(existing.cust_data||{}).forEach(v=>{ custMap[v.name]={name:v.name,so:v.so,zone:v.zone,state:v.state,amt:v.amt}; });
     Object.values(existing.daily_data||{}).forEach(v=>{
-      // convert display date back to ISO key for matching
       const d = new Date(v.date.replace(/-/g,' '));
       if (!isNaN(d)) dayMap[d.toISOString().slice(0,10)] = v.amt;
     });
 
-    setProg(30);
+    setProg(35);
 
     const STATE_ZONE={'HARYANA':'Delhi/NCR','DELHI':'Delhi/NCR','CHANDIGARH':'Delhi/NCR','RAJASTHAN':'Rajasthan','UTTAR PRADESH':'West UP & UK','UTTARAKHAND':'West UP & UK','PUNJAB':'Punjab'};
     let newLineCount=0, skippedCount=0, newTotal=0, minDate=null, maxDate=null;
     const newFingerprints = {};
-    const rejectedCustomers = {};
-    let rejectedCount = 0, rejectedAmt = 0;
+    const rejectedCustomers = {}, rejectedProducts = {};
+    let rejectedCustAmt = 0, rejectedProdAmt = 0;
+    const distinctCustomersInFile = new Set(), distinctProductsInFile = new Set();
 
     rows.forEach(r=>{
       const amt=parseFloat(r['Net Amount']||0); if(!amt) return;
 
       const custCode = String(r['Customer Code']||'').trim();
+      const prodCode = String(r['Product Code']||'').trim();
       const cust=String(r['Customer Name']||'').trim();
+      const prod=String(r['Product Description']||'').trim();
+      distinctCustomersInFile.add(cust);
+      distinctProductsInFile.add(prod);
 
-      // REJECT rows whose customer isn't in the saved SO mapping — do this BEFORE
-      // marking as processed, so fixing the mapping and re-uploading later still works.
-      const partyInfo = partyLookup ? partyLookup[custCode] : null;
+      // REJECT rows whose customer isn't in the saved mapping.
+      const partyInfo = custLookup ? custLookup[custCode] : null;
       if (!partyInfo) {
-        rejectedCount++;
-        rejectedAmt += amt;
+        rejectedCustAmt += amt;
         rejectedCustomers[cust] = (rejectedCustomers[cust]||0) + amt;
-        return; // excluded entirely — not added, not marked as processed
+        return;
       }
 
-      // Build a unique fingerprint per row: date + customer code + product code + amount
+      // REJECT rows whose product isn't in the saved Product List (only if we have one to check against).
+      if (hasProdCheck && !prodLookup[prodCode]) {
+        rejectedProdAmt += amt;
+        rejectedProducts[prod] = (rejectedProducts[prod]||0) + amt;
+        return;
+      }
+
       const rawDate = r['Invoice Date'];
       let dISO = '';
       let d = typeof rawDate==='number' ? new Date(Math.round((rawDate-25569)*86400*1000)) : new Date(rawDate);
       if (!isNaN(d)) dISO = d.toISOString().slice(0,10);
-      const prodCode = String(r['Product Code']||'').trim();
-      // Firebase RTDB keys cannot contain . $ # [ ] / or whitespace — sanitize before using as key
       const fingerprint = `${dISO}_${custCode}_${prodCode}_${amt}`.replace(/[.\$#\[\]\/\s]/g, '_');
 
       if (processedLines[fingerprint] || newFingerprints[fingerprint]) {
         skippedCount++;
-        return; // duplicate — already uploaded before, skip silently
+        return;
       }
       newFingerprints[fingerprint] = true;
 
       newLineCount++; newTotal+=amt;
-      const prod=String(r['Product Description']||'').trim();
       const state=String(r['State']||'').trim().toUpperCase();
       const soName = partyInfo.so;
       const zone2 = partyInfo.zone;
 
       if(prod){ prodMap[prod]=(prodMap[prod]||0)+amt; }
-
       if(cust){
         if(!custMap[cust]) custMap[cust]={name:cust,so:soName,zone:zone2,state:state.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()),amt:0};
         custMap[cust].amt+=amt;
       }
-
       if(soName){
         const soKey = soName+'|'+zone2;
         if(!soMap[soKey]) soMap[soKey]={name:soName,zone:zone2,amt:0};
         soMap[soKey].amt+=amt;
       }
-
       if(dISO){
         dayMap[dISO]=(dayMap[dISO]||0)+amt;
         if(!minDate||d<minDate)minDate=d;
@@ -730,10 +770,69 @@ window.processAndUpload = async function() {
       }
     });
 
-    setProg(60);
+    setProg(55);
 
-    if (newLineCount === 0) {
-      toast(`⚠ All ${skippedCount} rows were already uploaded before — nothing new to add`, true);
+    // Stash everything needed to commit later, without writing yet.
+    window._pendingUpload = {
+      soMap, prodMap, custMap, dayMap, processedLines, newFingerprints,
+      newLineCount, skippedCount, newTotal, minDate, maxDate, existing,
+      rejectedCustomers, rejectedProducts, rejectedCustAmt, rejectedProdAmt
+    };
+
+    // ── Build preview ──────────────────────────────────────────────────────
+    const totalRejectedAmt = rejectedCustAmt + rejectedProdAmt;
+    const rejCustNames = Object.keys(rejectedCustomers);
+    const rejProdNames = Object.keys(rejectedProducts);
+
+    let html = `
+      <div><b style="color:var(--text)">File:</b> ${file.name}</div>
+      <div><b style="color:var(--text)">Total rows in file:</b> ${rows.length}</div>
+      <div><b style="color:var(--green)">Will be added:</b> ${newLineCount} rows (₹${(newTotal/100000).toFixed(2)}L)</div>
+      <div><b style="color:var(--text-dim)">Already uploaded before (skipped):</b> ${skippedCount} rows</div>
+    `;
+    if (rejCustNames.length || rejProdNames.length) {
+      html += `<div style="margin-top:10px;color:var(--red)"><b>⚠ Will be REJECTED — not in your master sheet (₹${(totalRejectedAmt/100000).toFixed(2)}L total):</b></div>`;
+      if (rejCustNames.length) html += `<div style="margin-top:4px;color:var(--red)">Unknown customers (${rejCustNames.length}): ${rejCustNames.slice(0,15).join(', ')}${rejCustNames.length>15?` +${rejCustNames.length-15} more`:''}</div>`;
+      if (rejProdNames.length) html += `<div style="margin-top:4px;color:var(--red)">Unknown products (${rejProdNames.length}): ${rejProdNames.slice(0,15).join(', ')}${rejProdNames.length>15?` +${rejProdNames.length-15} more`:''}</div>`;
+      html += `<div style="margin-top:8px;color:var(--amber)">If this looks like the WRONG FILE (different division, wrong date range, etc.) — click Cancel and check before proceeding.</div>`;
+    } else {
+      html += `<div style="margin-top:10px;color:var(--green)">✓ Every row matched your master sheet — looks like a clean upload.</div>`;
+    }
+
+    document.getElementById('previewContent').innerHTML = html;
+    document.getElementById('previewModal').style.display = 'flex';
+    setProg(0);
+    btn.disabled = false;
+    btn.textContent = '⬆ PROCESS & ADD NEW DATA';
+  } catch(e){
+    toast(e.message,true);
+    btn.disabled=false;
+    btn.textContent='⬆ PROCESS & ADD NEW DATA';
+    document.getElementById('xlProg').style.width='0%';
+  }
+};
+
+window.cancelUpload = function() {
+  document.getElementById('previewModal').style.display = 'none';
+  window._pendingUpload = null;
+  toast('Upload cancelled — nothing was changed', true);
+};
+
+// STEP 2: Only called after explicit user confirmation in the preview modal.
+window.confirmUpload = async function() {
+  const p = window._pendingUpload;
+  if (!p) return;
+  document.getElementById('previewModal').style.display = 'none';
+
+  const btn = document.getElementById('xlUpBtn');
+  btn.disabled = true;
+  btn.textContent = 'UPLOADING...';
+  const setProg = pct => document.getElementById('xlProg').style.width = pct+'%';
+  setProg(60);
+
+  try {
+    if (p.newLineCount === 0) {
+      toast(`⚠ Nothing new to add — ${p.skippedCount} rows were duplicates, rest were rejected`, true);
       btn.disabled = false;
       btn.textContent = '⬆ PROCESS & ADD NEW DATA';
       setProg(0);
@@ -741,23 +840,22 @@ window.processAndUpload = async function() {
     }
 
     const so_data={}, product_data={}, cust_data={}, daily_data={};
-    Object.entries(soMap).forEach(([,v],i)=>{ v.amt=Math.round(v.amt*100)/100; so_data[`so_${i}`]=v; });
-    Object.entries(prodMap).forEach(([name,amt],i)=>{product_data[`prod_${i}`]={name,amt:Math.round(amt*100)/100};});
-    Object.entries(custMap).forEach(([,v],i)=>{v.amt=Math.round(v.amt*100)/100;cust_data[`cust_${i}`]=v;});
-    Object.entries(dayMap).sort().forEach(([key,amt],i)=>{
+    Object.entries(p.soMap).forEach(([,v],i)=>{ v.amt=Math.round(v.amt*100)/100; so_data[`so_${i}`]=v; });
+    Object.entries(p.prodMap).forEach(([name,amt],i)=>{product_data[`prod_${i}`]={name,amt:Math.round(amt*100)/100};});
+    Object.entries(p.custMap).forEach(([,v],i)=>{v.amt=Math.round(v.amt*100)/100;cust_data[`cust_${i}`]=v;});
+    Object.entries(p.dayMap).sort().forEach(([key,amt],i)=>{
       const d=new Date(key);
       daily_data[`day_${i}`]={date:d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,'-'),amt:Math.round(amt*100)/100};
     });
 
-    // Merge processed-line fingerprints (existing + new)
-    const updatedProcessedLines = Object.assign({}, processedLines);
-    Object.keys(newFingerprints).forEach(fp => { updatedProcessedLines[fp] = true; });
+    const updatedProcessedLines = Object.assign({}, p.processedLines);
+    Object.keys(p.newFingerprints).forEach(fp => { updatedProcessedLines[fp] = true; });
 
     const grandTotal = Object.values(cust_data).reduce((s,v)=>s+v.amt,0);
-    const allDates = Object.keys(dayMap).sort();
+    const allDates = Object.keys(p.dayMap).sort();
     const meta={
-      period: allDates.length ? `${new Date(allDates[0]).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})} → ${new Date(allDates[allDates.length-1]).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}` : (existing.meta?.period||''),
-      period_tag: allDates.length ? new Date(allDates[allDates.length-1]).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : (existing.meta?.period_tag||''),
+      period: allDates.length ? `${new Date(allDates[0]).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})} → ${new Date(allDates[allDates.length-1]).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}` : (p.existing.meta?.period||''),
+      period_tag: allDates.length ? new Date(allDates[allDates.length-1]).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : (p.existing.meta?.period_tag||''),
       billing_days: allDates.length,
       sap_info:`SAP Lines: ${Object.keys(updatedProcessedLines).length} · ₹${(grandTotal/100000).toFixed(2)}L`,
     };
@@ -773,21 +871,26 @@ window.processAndUpload = async function() {
     ]);
     setProg(100);
 
-    const rejectedNames = Object.keys(rejectedCustomers);
     const warnEl = document.getElementById('unmappedWarning');
-    if (rejectedNames.length > 0) {
-      const list = rejectedNames.map(n => `${n} (₹${(rejectedCustomers[n]/1000).toFixed(1)}K)`).join(', ');
+    const rejCustNames = Object.keys(p.rejectedCustomers);
+    const rejProdNames = Object.keys(p.rejectedProducts);
+    if (rejCustNames.length || rejProdNames.length) {
+      let msg = '';
+      if (rejCustNames.length) msg += `Unknown customers (₹${(p.rejectedCustAmt/100000).toFixed(2)}L): ${rejCustNames.map(n=>`${n} (₹${(p.rejectedCustomers[n]/1000).toFixed(1)}K)`).join(', ')}<br>`;
+      if (rejProdNames.length) msg += `Unknown products (₹${(p.rejectedProdAmt/100000).toFixed(2)}L): ${rejProdNames.map(n=>`${n} (₹${(p.rejectedProducts[n]/1000).toFixed(1)}K)`).join(', ')}<br>`;
       warnEl.style.display = 'block';
-      warnEl.innerHTML = `⚠ ${rejectedNames.length} customer(s) NOT in your SO mapping — EXCLUDED from upload entirely (₹${(rejectedAmt/100000).toFixed(2)}L rejected, not added to any totals):<br>${list}<br><br>To include them: add these to your Master Data Sheet, re-save the mapping, then re-upload this same file — rejected rows are not marked as processed, so they'll be picked up correctly next time.`;
-      toast(`✓ Added ${newLineCount} rows · ⚠ Rejected ${rejectedNames.length} unmapped customers (₹${(rejectedAmt/100000).toFixed(2)}L excluded)`, true);
+      warnEl.innerHTML = `⚠ Rows excluded from this upload — not in your master sheet:<br>${msg}<br>To include them: add to your Master Data Sheet, re-save mapping, then re-upload this same file.`;
+      toast(`✓ Added ${p.newLineCount} rows · ⚠ Rejected ${rejCustNames.length+rejProdNames.length} unmapped entries`, true);
     } else {
       warnEl.style.display = 'none';
-      toast(`✓ Added ${newLineCount} new rows (₹${(newTotal/100000).toFixed(2)}L) · Skipped ${skippedCount} duplicates · All customers matched`);
+      toast(`✓ Added ${p.newLineCount} new rows (₹${(p.newTotal/100000).toFixed(2)}L) · Skipped ${p.skippedCount} duplicates · Clean upload`);
     }
+
     btn.textContent = '✓ DATA ADDED!';
     btn.style.background='linear-gradient(135deg,rgba(74,222,128,0.2),rgba(74,222,128,0.1))';
     btn.style.borderColor='var(--green)';
     btn.style.color='var(--green)';
+    window._pendingUpload = null;
     loadAll();
   } catch(e){
     toast(e.message,true);
