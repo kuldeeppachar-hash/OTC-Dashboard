@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PIL OTC — Admin Panel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  :root{--bg:#060a12;--surface:#0d1520;--surface2:#111c2e;--border:rgba(56,189,248,0.15);--border2:rgba(56,189,248,0.07);--cyan:#38bdf8;--green:#4ade80;--red:#f87171;--amber:#fbbf24;--purple:#a78bfa;--text:#e2e8f0;--text-dim:#64748b;--text-mid:#94a3b8;--mono:'JetBrains Mono',monospace;--sans:'Space Grotesk',sans-serif;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;min-height:100vh;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(56,189,248,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .header{background:rgba(6,10,18,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;}
+  .header-left{display:flex;align-items:center;gap:14px;}
+  .logo-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--amber),var(--red));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#000;}
+  .logo-text{font-size:15px;font-weight:600;}
+  .logo-text span{color:var(--amber);}
+  .header-tag{background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.25);color:var(--amber);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:4px;}
+  .nav-link{color:var(--text-dim);font-family:var(--mono);font-size:11px;text-decoration:none;padding:4px 10px;border-radius:6px;border:1px solid var(--border2);transition:all 0.15s;}
+  .nav-link:hover{border-color:var(--cyan);color:var(--cyan);}
+  main{position:relative;z-index:1;padding:24px;max-width:1200px;margin:0 auto;}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+  .panel{background:var(--surface);border:1px solid var(--border2);border-radius:12px;overflow:hidden;}
+  .panel-header{padding:14px 18px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;}
+  .panel-title{font-size:11px;font-weight:600;color:var(--text-mid);font-family:var(--mono);letter-spacing:0.5px;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+  .dot{width:6px;height:6px;border-radius:50%;}
+  .panel-body{padding:16px 18px;}
+  label{display:block;font-size:10px;font-family:var(--mono);color:var(--text-dim);letter-spacing:0.5px;margin-bottom:5px;margin-top:12px;}
+  label:first-child{margin-top:0;}
+  input,select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:8px 10px;border-radius:6px;outline:none;transition:border-color 0.15s;}
+  input:focus,select:focus,textarea:focus{border-color:var(--cyan);}
+  textarea{resize:vertical;min-height:80px;}
+  .row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;border:none;cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:0.3px;transition:all 0.2s;}
+  .btn-cyan{background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.35);color:var(--cyan);}
+  .btn-cyan:hover{background:rgba(56,189,248,0.25);}
+  .btn-green{background:rgba(74,222,128,0.15);border:1px solid rgba(74,222,128,0.35);color:var(--green);}
+  .btn-green:hover{background:rgba(74,222,128,0.25);}
+  .btn-red{background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.3);color:var(--red);}
+  .btn-red:hover{background:rgba(248,113,113,0.2);}
+  .btn-amber{background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.3);color:var(--amber);}
+  .btn-amber:hover{background:rgba(251,191,36,0.2);}
+  .btn-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+  .item-list{margin-top:12px;max-height:280px;overflow-y:auto;}
+  .item-list::-webkit-scrollbar{width:3px;}
+  .item-list::-webkit-scrollbar-thumb{background:var(--border);}
+  .item-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border2);font-size:11px;font-family:var(--mono);}
+  .item-row:last-child{border-bottom:none;}
+  .item-row:hover{background:rgba(56,189,248,0.03);}
+  .item-name{flex:1;color:var(--text-mid);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .item-amt{color:var(--cyan);width:80px;text-align:right;}
+  .item-zone{font-size:10px;padding:2px 6px;border-radius:4px;}
+  .zone-DL{background:rgba(74,222,128,0.12);color:var(--green);}
+  .zone-RJ{background:rgba(251,191,36,0.12);color:var(--amber);}
+  .zone-UP{background:rgba(56,189,248,0.12);color:var(--cyan);}
+  .zone-PB{background:rgba(248,113,113,0.12);color:var(--red);}
+  .zone-OT{background:rgba(167,139,250,0.12);color:var(--purple);}
+  .del-btn{background:none;border:none;color:var(--text-dim);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:11px;}
+  .del-btn:hover{background:rgba(248,113,113,0.15);color:var(--red);}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;}
+  .toast.show{opacity:1;}
+  .toast.err{border-color:var(--red);color:var(--red);}
+  .kpi-mini{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+  .kpi-m{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;}
+  .kpi-m-label{font-size:9px;font-family:var(--mono);color:var(--text-dim);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;}
+  .kpi-m-val{font-size:20px;font-weight:700;letter-spacing:-0.5px;}
+  .upload-zone{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all 0.2s;font-family:var(--mono);font-size:11px;color:var(--text-dim);}
+  .upload-zone:hover,.upload-zone.drag{border-color:var(--cyan);background:rgba(56,189,248,0.04);color:var(--cyan);}
+  .prog-bar{height:3px;background:var(--border2);border-radius:2px;margin-top:10px;overflow:hidden;}
+  .prog-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));transition:width 0.3s;width:0%;}
+  .section-divider{display:flex;align-items:center;gap:12px;margin:20px 0 14px;}
+  .section-divider-label{font-size:9px;font-family:var(--mono);color:var(--text-dim);text-transform:uppercase;letter-spacing:1.5px;white-space:nowrap;}
+  .section-divider-line{flex:1;height:1px;background:var(--border2);}
+</style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<style>
+  #loginGate{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
+  #loginGate.hide{display:none;}
+  .login-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:34px;width:320px;}
+  .login-box h2{font-size:16px;color:var(--amber);margin-bottom:4px;}
+  .login-box p{font-size:11px;color:var(--text-dim);margin-bottom:20px;font-family:var(--mono);}
+  .login-box input{margin-bottom:10px;}
+  .login-box button{width:100%;margin-top:8px;padding:10px;background:linear-gradient(135deg,var(--amber),var(--red));border:none;border-radius:8px;color:#000;font-family:var(--mono);font-weight:700;font-size:12px;cursor:pointer;}
+  .login-err{color:var(--red);font-size:11px;font-family:var(--mono);margin-top:10px;min-height:14px;}
+  #adminApp{display:none;}
+  #adminApp.show{display:block;}
+</style>
+</head>
+<body>
+
+
+<div class="toast" id="toast"></div>
+
+<div id="loginGate">
+  <div class="login-box">
+    <h2>⚙ Admin Login Required</h2>
+    <p>// Sign in to edit PIL OTC data</p>
+    <label>EMAIL</label>
+    <input id="loginEmail" type="email" placeholder="you@example.com">
+    <label>PASSWORD</label>
+    <input id="loginPass" type="password" placeholder="••••••••">
+    <button onclick="doLogin()">SIGN IN</button>
+    <div class="login-err" id="loginErr"></div>
+  </div>
+</div>
+
+<div id="adminContent" style="display:none">
+<div class="header">
+  <div class="header-left">
+    <div class="logo-mark">⚙</div>
+    <div class="logo-text">PIL <span>OTC</span> Admin</div>
+    <div class="header-tag">DATA MANAGER</div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center">
+    <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="dbStatus">● Connecting...</span>
+    <a href="upload_to_firebase.html" class="nav-link">⬆ Bulk Upload</a>
+    <a href="dashboard.html" class="nav-link">📊 Dashboard</a>
+  </div>
+</div>
+
+<main>
+
+  <!-- KPI ROW -->
+  <div class="kpi-mini" id="kpiMini">
+    <div class="kpi-m"><div class="kpi-m-label">Total Sales</div><div class="kpi-m-val" id="kTotal" style="color:var(--cyan)">—</div></div>
+    <div class="kpi-m"><div class="kpi-m-label">SOs Active</div><div class="kpi-m-val" id="kSOs" style="color:var(--green)">—</div></div>
+    <div class="kpi-m"><div class="kpi-m-label">Stockists</div><div class="kpi-m-val" id="kCust" style="color:var(--amber)">—</div></div>
+    <div class="kpi-m"><div class="kpi-m-label">SKUs</div><div class="kpi-m-val" id="kProds" style="color:var(--purple)">—</div></div>
+  </div>
+
+  <!-- QUICK UPLOAD SECTION -->
+  <div class="section-divider">
+    <div class="section-divider-label">// BULK UPLOAD NEW EXCEL</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div class="panel" style="margin-bottom:16px">
+    <div class="panel-header">
+      <div class="panel-title"><div class="dot" style="background:var(--amber)"></div>Upload New Month Excel → Auto-push to Firebase</div>
+    </div>
+    <div class="panel-body">
+      <div class="upload-zone" id="dropZone" onclick="document.getElementById('xlFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
+        <input type="file" id="xlFile" accept=".xlsx,.xls" onchange="handleXlFile(this.files[0])" style="display:none">
+        📁 Step 1: Drop SAP sales Excel here · or click to browse<br>
+        <span style="color:var(--text-dim);font-size:10px">Needs: Customer Code, Customer Name, Product Description, Net Amount, Invoice Date, State</span>
+        <div style="color:var(--green);margin-top:6px;font-size:11px" id="xlFileName"></div>
+      </div>
+      <div class="upload-zone" id="dropZonePartyList" onclick="document.getElementById('partyFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDropParty(event)" style="margin-top:10px">
+        <input type="file" id="partyFile" accept=".xlsx,.xls" onchange="handlePartyFile(this.files[0])" style="display:none">
+        📁 Step 2: Drop Master Data Sheet (Party List with SO Name) here<br>
+        <span style="color:var(--text-dim);font-size:10px">Needs sheet "Party List" with columns: SAP Code, SO Name, State</span>
+        <div style="color:var(--green);margin-top:6px;font-size:11px" id="partyFileName"></div>
+      </div>
+      <div class="prog-bar"><div class="prog-fill" id="xlProg"></div></div>
+      <div class="btn-row">
+        <button class="btn btn-amber" id="xlUpBtn" onclick="processAndUpload()" disabled>⬆ PROCESS & REPLACE FIREBASE DATA</button>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);align-self:center">⚠ This replaces all existing data</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANUAL EDITS -->
+  <div class="section-divider">
+    <div class="section-divider-label">// MANUAL DATA EDITOR</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- ADD SO -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><div class="dot" style="background:var(--green)"></div>SO Performance</div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="soCount">0 SOs</span>
+      </div>
+      <div class="panel-body">
+        <div class="row-2">
+          <div><label>SO NAME</label><input id="soName" placeholder="e.g. Prashant"></div>
+          <div><label>ZONE</label>
+            <select id="soZone">
+              <option value="Delhi/NCR">Delhi / NCR</option>
+              <option value="Rajasthan">Rajasthan</option>
+              <option value="West UP & UK">West UP & UK</option>
+              <option value="Punjab">Punjab</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div><label>NET AMOUNT (₹)</label><input id="soAmt" type="number" placeholder="e.g. 134000"></div>
+        <div class="btn-row">
+          <button class="btn btn-green" onclick="addSO()">+ ADD SO</button>
+          <button class="btn btn-red" onclick="clearAll('so_data','SO')">🗑 Clear All SOs</button>
+        </div>
+        <div class="item-list" id="soList"></div>
+      </div>
+    </div>
+
+    <!-- ADD STOCKIST -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><div class="dot" style="background:var(--purple)"></div>Stockist Data</div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="custCount">0 Stockists</span>
+      </div>
+      <div class="panel-body">
+        <div><label>STOCKIST NAME</label><input id="custName" placeholder="e.g. Tej Vashishth Pharmaceutical"></div>
+        <div class="row-3">
+          <div><label>SO NAME</label><input id="custSO" placeholder="e.g. Prashant"></div>
+          <div><label>ZONE</label>
+            <select id="custZone">
+              <option value="Delhi/NCR">Delhi / NCR</option>
+              <option value="Rajasthan">Rajasthan</option>
+              <option value="West UP & UK">West UP & UK</option>
+              <option value="Punjab">Punjab</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div><label>STATE</label><input id="custState" placeholder="Haryana"></div>
+        </div>
+        <div><label>NET AMOUNT (₹)</label><input id="custAmt" type="number" placeholder="e.g. 92000"></div>
+        <div class="btn-row">
+          <button class="btn btn-cyan" onclick="addStockist()">+ ADD STOCKIST</button>
+          <button class="btn btn-red" onclick="clearAll('cust_data','Stockist')">🗑 Clear All</button>
+        </div>
+        <div class="item-list" id="custList"></div>
+      </div>
+    </div>
+
+    <!-- ADD PRODUCT -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><div class="dot" style="background:var(--amber)"></div>Product Data</div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="prodCount">0 Products</span>
+      </div>
+      <div class="panel-body">
+        <div><label>PRODUCT NAME</label><input id="prodName" placeholder="e.g. SENSOPIL GEL 125GM"></div>
+        <div><label>NET AMOUNT (₹)</label><input id="prodAmt" type="number" placeholder="e.g. 87600"></div>
+        <div class="btn-row">
+          <button class="btn btn-amber" onclick="addProduct()">+ ADD PRODUCT</button>
+          <button class="btn btn-red" onclick="clearAll('product_data','Product')">🗑 Clear All</button>
+        </div>
+        <div class="item-list" id="prodList"></div>
+      </div>
+    </div>
+
+    <!-- DAILY DATA -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><div class="dot" style="background:var(--cyan)"></div>Daily Billing</div>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="dailyCount">0 Days</span>
+      </div>
+      <div class="panel-body">
+        <div class="row-2">
+          <div><label>DATE</label><input id="dayDate" type="date"></div>
+          <div><label>NET BILLING (₹)</label><input id="dayAmt" type="number" placeholder="e.g. 138000"></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-cyan" onclick="addDay()">+ ADD DAY</button>
+          <button class="btn btn-red" onclick="clearAll('daily_data','Daily')">🗑 Clear All</button>
+        </div>
+        <div class="item-list" id="dayList"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- META -->
+  <div class="panel" style="margin-top:4px">
+    <div class="panel-header">
+      <div class="panel-title"><div class="dot" style="background:var(--text-mid)"></div>Dashboard Meta Info</div>
+    </div>
+    <div class="panel-body">
+      <div class="row-3">
+        <div><label>PERIOD TAG (header)</label><input id="metaTag" placeholder="Jun 2026"></div>
+        <div><label>PERIOD TEXT (sub)</label><input id="metaPeriod" placeholder="01 Jun → 27 Jun 2026"></div>
+        <div><label>SAP INFO CHIP</label><input id="metaSap" placeholder="SAP Lines: 735 · ₹10.78L"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-green" onclick="saveMeta()">💾 SAVE META</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyBnsCYzc2J_NfBEpRzEq0-PDKrGuCnTGFw",
+  authDomain: "otc-dashboard-4c418.firebaseapp.com",
+  databaseURL: "https://otc-dashboard-4c418-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "otc-dashboard-4c418",
+  storageBucket: "otc-dashboard-4c418.firebasestorage.app",
+  messagingSenderId: "45401311739",
+  appId: "1:45401311739:web:53e4b7a57a5b8800d6235e"
+});
+const db = firebase.database();
+const auth = firebase.auth();
+
+window.doLogin = function() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  const err   = document.getElementById('loginErr');
+  err.textContent = '';
+  auth.signInWithEmailAndPassword(email, pass).catch(e => {
+    err.textContent = e.message;
+  });
+};
+
+auth.onAuthStateChanged(function(user) {
+  if (user) {
+    document.getElementById('loginGate').classList.add('hide');
+    document.getElementById('adminContent').style.display = 'block';
+    loadAll();
+  } else {
+    document.getElementById('loginGate').classList.remove('hide');
+    document.getElementById('adminContent').style.display = 'none';
+  }
+});
+
+function toast(msg, err=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (err?' err':'') + ' show';
+  setTimeout(() => t.className='toast', 2500);
+}
+
+// ── LOAD ALL DATA ────────────────────────────────────────────────────────────
+async function loadAll() {
+  try {
+    const snap = await db.ref('/').once('value');
+    const d = snap.val() || {};
+    document.getElementById('dbStatus').textContent = '● Connected';
+    document.getElementById('dbStatus').style.color = 'var(--green)';
+
+    const so   = d.so_data      ? Object.entries(d.so_data)      : [];
+    const prod = d.product_data ? Object.entries(d.product_data) : [];
+    const cust = d.cust_data    ? Object.entries(d.cust_data)    : [];
+    const day  = d.daily_data   ? Object.entries(d.daily_data)   : [];
+    const meta = d.meta || {};
+
+    // KPIs
+    const total = cust.reduce((s,[,v])=>s+v.amt,0);
+    document.getElementById('kTotal').textContent = `₹${(total/100000).toFixed(2)}L`;
+    document.getElementById('kSOs').textContent   = so.length;
+    document.getElementById('kCust').textContent  = cust.length;
+    document.getElementById('kProds').textContent = prod.length;
+
+    // Lists
+    renderSOList(so);
+    renderProdList(prod);
+    renderCustList(cust);
+    renderDayList(day);
+
+    // Meta
+    document.getElementById('metaTag').value    = meta.period_tag||'';
+    document.getElementById('metaPeriod').value = meta.period||'';
+    document.getElementById('metaSap').value    = meta.sap_info||'';
+  } catch(e) {
+    document.getElementById('dbStatus').textContent = '● Error: '+e.message;
+    document.getElementById('dbStatus').style.color = 'var(--red)';
+  }
+}
+
+const ZONE_CODE = {'Delhi/NCR':'DL','Rajasthan':'RJ','West UP & UK':'UP','Punjab':'PB'};
+function zoneClass(z) { return 'zone-'+(ZONE_CODE[z]||'OT'); }
+
+function renderSOList(entries) {
+  const sorted = [...entries].sort((a,b)=>b[1].amt-a[1].amt);
+  document.getElementById('soCount').textContent = sorted.length+' SOs';
+  document.getElementById('soList').innerHTML = sorted.map(([k,v])=>`
+    <div class="item-row">
+      <span class="item-name">${v.name}</span>
+      <span class="item-zone ${zoneClass(v.zone)}">${v.zone}</span>
+      <span class="item-amt">₹${(v.amt/1000).toFixed(1)}K</span>
+      <button class="del-btn" onclick="delEntry('so_data','${k}')">✕</button>
+    </div>`).join('');
+}
+function renderProdList(entries) {
+  const sorted = [...entries].sort((a,b)=>b[1].amt-a[1].amt);
+  document.getElementById('prodCount').textContent = sorted.length+' Products';
+  document.getElementById('prodList').innerHTML = sorted.slice(0,20).map(([k,v])=>`
+    <div class="item-row">
+      <span class="item-name">${v.name}</span>
+      <span class="item-amt">₹${(v.amt/1000).toFixed(1)}K</span>
+      <button class="del-btn" onclick="delEntry('product_data','${k}')">✕</button>
+    </div>`).join('');
+}
+function renderCustList(entries) {
+  const sorted = [...entries].sort((a,b)=>b[1].amt-a[1].amt);
+  document.getElementById('custCount').textContent = sorted.length+' Stockists';
+  document.getElementById('custList').innerHTML = sorted.map(([k,v])=>`
+    <div class="item-row">
+      <span class="item-name">${v.name}</span>
+      <span class="item-zone ${zoneClass(v.zone)}">${v.zone}</span>
+      <span class="item-amt">₹${(v.amt/1000).toFixed(1)}K</span>
+      <button class="del-btn" onclick="delEntry('cust_data','${k}')">✕</button>
+    </div>`).join('');
+}
+function renderDayList(entries) {
+  const sorted = [...entries].sort((a,b)=>new Date(a[1].date)-new Date(b[1].date));
+  document.getElementById('dailyCount').textContent = sorted.length+' Days';
+  document.getElementById('dayList').innerHTML = sorted.map(([k,v])=>`
+    <div class="item-row">
+      <span class="item-name">${v.date}</span>
+      <span class="item-amt">₹${(v.amt/1000).toFixed(1)}K</span>
+      <button class="del-btn" onclick="delEntry('daily_data','${k}')">✕</button>
+    </div>`).join('');
+}
+
+// ── ADD ENTRIES ──────────────────────────────────────────────────────────────
+window.addSO = async function() {
+  const name=document.getElementById('soName').value.trim();
+  const zone=document.getElementById('soZone').value;
+  const amt=parseFloat(document.getElementById('soAmt').value);
+  if (!name||!amt) { toast('Fill SO name and amount',true); return; }
+  try {
+    await db.ref('/so_data').push({name,zone,amt});
+    toast('✓ SO added');
+    document.getElementById('soName').value='';
+    document.getElementById('soAmt').value='';
+    loadAll();
+  } catch(e){ toast(e.message,true); }
+};
+
+window.addProduct = async function() {
+  const name=document.getElementById('prodName').value.trim();
+  const amt=parseFloat(document.getElementById('prodAmt').value);
+  if (!name||!amt) { toast('Fill product name and amount',true); return; }
+  try {
+    await db.ref('/product_data').push({name,amt});
+    toast('✓ Product added');
+    document.getElementById('prodName').value='';
+    document.getElementById('prodAmt').value='';
+    loadAll();
+  } catch(e){ toast(e.message,true); }
+};
+
+window.addStockist = async function() {
+  const name=document.getElementById('custName').value.trim();
+  const so=document.getElementById('custSO').value.trim();
+  const zone=document.getElementById('custZone').value;
+  const state=document.getElementById('custState').value.trim();
+  const amt=parseFloat(document.getElementById('custAmt').value);
+  if (!name||!amt) { toast('Fill stockist name and amount',true); return; }
+  try {
+    await db.ref('/cust_data').push({name,so,zone,state,amt});
+    toast('✓ Stockist added');
+    document.getElementById('custName').value='';
+    document.getElementById('custAmt').value='';
+    loadAll();
+  } catch(e){ toast(e.message,true); }
+};
+
+window.addDay = async function() {
+  const rawDate=document.getElementById('dayDate').value;
+  const amt=parseFloat(document.getElementById('dayAmt').value);
+  if (!rawDate||!amt) { toast('Fill date and amount',true); return; }
+  const d=new Date(rawDate);
+  const dateStr=d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,'-');
+  try {
+    await db.ref('/daily_data').push({date:dateStr,amt});
+    toast('✓ Day added');
+    document.getElementById('dayDate').value='';
+    document.getElementById('dayAmt').value='';
+    loadAll();
+  } catch(e){ toast(e.message,true); }
+};
+
+window.delEntry = async function(path, key) {
+  try {
+    await db.ref(`/${path}/${key}`).remove();
+    toast('✓ Deleted');
+    loadAll();
+  } catch(e){ toast(e.message,true); }
+};
+
+window.clearAll = async function(path, label) {
+  if (!confirm(`Delete ALL ${label} data from Firebase? This cannot be undone.`)) return;
+  try {
+    await db.ref('/'+path).remove();
+    toast(`✓ All ${label} data cleared`);
+    loadAll();
+  } catch(e){ toast(e.message,true); }
+};
+
+window.saveMeta = async function() {
+  const meta = {
+    period_tag: document.getElementById('metaTag').value.trim(),
+    period:     document.getElementById('metaPeriod').value.trim(),
+    sap_info:   document.getElementById('metaSap').value.trim(),
+  };
+  try {
+    await db.ref('/meta').set(meta);
+    toast('✓ Meta saved — dashboard updated');
+  } catch(e){ toast(e.message,true); }
+};
+
+// ── EXCEL UPLOAD ─────────────────────────────────────────────────────────────
+window.handleDrop = function(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag');
+  handleXlFile(e.dataTransfer.files[0]);
+};
+
+window.handleDropParty = function(e) {
+  e.preventDefault();
+  document.getElementById('dropZonePartyList').classList.remove('drag');
+  handlePartyFile(e.dataTransfer.files[0]);
+};
+
+window.handlePartyFile = async function(file) {
+  if (!file) return;
+  document.getElementById('partyFileName').textContent = '📄 ' + file.name;
+  toast('Reading Party List...');
+  try {
+    if (!window.XLSX) {
+      await new Promise(r=>{ const s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';s.onload=r;document.head.appendChild(s); });
+    }
+    const buf = await file.arrayBuffer();
+    const wb  = XLSX.read(buf);
+    const sheetName = wb.SheetNames.find(n => n.toLowerCase().includes('party')) || wb.SheetNames[0];
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName]);
+    const STATE_ZONE={'HARYANA':'Delhi/NCR','DELHI':'Delhi/NCR','CHANDIGARH':'Delhi/NCR','RAJASTHAN':'Rajasthan','UTTAR PRADESH':'West UP & UK','UTTARAKHAND':'West UP & UK','PUNJAB':'Punjab'};
+    const lookup = {};
+    rows.forEach(r => {
+      const code = String(parseInt(r['SAP Code'])||'').trim();
+      if (!code || code==='NaN') return;
+      const state = String(r['State']||'').trim().toUpperCase();
+      lookup[code] = {
+        so: String(r['SO Name']||'').trim(),
+        zone: STATE_ZONE[state] || 'Other',
+      };
+    });
+    window._partyLookup = lookup;
+    toast(`✓ Party List loaded: ${Object.keys(lookup).length} customer mappings`);
+  } catch(e) {
+    toast('Party list error: ' + e.message, true);
+  }
+};
+
+window.handleXlFile = function(file) {
+  if (!file) return;
+  document.getElementById('xlFileName').textContent = '📄 ' + file.name;
+  document.getElementById('xlUpBtn').disabled = false;
+  window._xlFile = file;
+};
+
+window.processAndUpload = async function() {
+  const file = window._xlFile;
+  if (!file) return;
+  if (!window._partyLookup) {
+    toast('Upload Party List file first (Step 2) — SO names need it', true);
+    return;
+  }
+  const btn = document.getElementById('xlUpBtn');
+  btn.disabled = true;
+  btn.textContent = 'PROCESSING...';
+  const setProg = p => document.getElementById('xlProg').style.width = p+'%';
+  setProg(5);
+  try {
+    if (!window.XLSX) {
+      await new Promise(r=>{ const s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';s.onload=r;document.head.appendChild(s); });
+    }
+    const buf  = await file.arrayBuffer();
+    const wb   = XLSX.read(buf);
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+    setProg(20);
+    toast(`Loaded ${rows.length} rows…`);
+
+    const STATE_ZONE={'HARYANA':'Delhi/NCR','DELHI':'Delhi/NCR','CHANDIGARH':'Delhi/NCR','RAJASTHAN':'Rajasthan','UTTAR PRADESH':'West UP & UK','UTTARAKHAND':'West UP & UK','PUNJAB':'Punjab'};
+    const soMap={},prodMap={},custMap={},dayMap={};
+    let total=0,lineCount=0,minDate=null,maxDate=null;
+
+    rows.forEach(r=>{
+      const amt=parseFloat(r['Net Amount']||0); if(!amt) return;
+      lineCount++; total+=amt;
+      const prod=String(r['Product Description']||'').trim();
+      const cust=String(r['Customer Name']||'').trim();
+      const state=String(r['State']||'').trim().toUpperCase();
+      const zone=STATE_ZONE[state]||'Other';
+
+      if(prod){ prodMap[prod]=(prodMap[prod]||0)+amt; }
+
+      const partyInfo = window._partyLookup ? window._partyLookup[String(r['Customer Code']||'').trim()] : null;
+      const soName = partyInfo ? partyInfo.so : '';
+      const zone2 = partyInfo ? partyInfo.zone : zone;
+
+      if(cust){
+        if(!custMap[cust]) custMap[cust]={name:cust,so:soName,zone:zone2,state:state.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()),amt:0};
+        custMap[cust].amt+=amt;
+      }
+
+      if(soName){
+        const soKey = soName+'|'+zone2;
+        if(!soMap[soKey]) soMap[soKey]={name:soName,zone:zone2,amt:0};
+        soMap[soKey].amt+=amt;
+      }
+
+      const rawDate=r['Invoice Date'];
+      if(rawDate){
+        let d=typeof rawDate==='number'?new Date(Math.round((rawDate-25569)*86400*1000)):new Date(rawDate);
+        if(!isNaN(d)){
+          const key=d.toISOString().slice(0,10);
+          dayMap[key]=(dayMap[key]||0)+amt;
+          if(!minDate||d<minDate)minDate=d;
+          if(!maxDate||d>maxDate)maxDate=d;
+        }
+      }
+    });
+
+    setProg(50);
+    const so_data={}, product_data={}, cust_data={}, daily_data={};
+    Object.entries(soMap).forEach(([,v],i)=>{ v.amt=Math.round(v.amt*100)/100; so_data[`so_${i}`]=v; });
+    Object.entries(prodMap).forEach(([name,amt],i)=>{product_data[`prod_${i}`]={name,amt:Math.round(amt*100)/100};});
+    Object.entries(custMap).forEach(([,v],i)=>{v.amt=Math.round(v.amt*100)/100;cust_data[`cust_${i}`]=v;});
+    Object.entries(dayMap).sort().forEach(([key,amt],i)=>{
+      const d=new Date(key);
+      daily_data[`day_${i}`]={date:d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,'-'),amt:Math.round(amt*100)/100};
+    });
+    const meta={
+      period: minDate&&maxDate?`${minDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})} → ${maxDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}`:'',
+      period_tag: minDate?minDate.toLocaleDateString('en-IN',{month:'short',year:'numeric'}):'',
+      billing_days: Object.keys(dayMap).length,
+      sap_info:`SAP Lines: ${lineCount} · ₹${(total/100000).toFixed(2)}L`,
+    };
+
+    setProg(70);
+    await Promise.all([
+      db.ref('/so_data').set(so_data),
+      db.ref('/product_data').set(product_data),
+      db.ref('/cust_data').set(cust_data),
+      db.ref('/daily_data').set(daily_data),
+      db.ref('/meta').set(meta),
+    ]);
+    setProg(100);
+    toast(`✓ ${lineCount} lines uploaded · ₹${(total/100000).toFixed(2)}L`);
+    btn.textContent = '✓ UPLOADED!';
+    btn.style.background='linear-gradient(135deg,rgba(74,222,128,0.2),rgba(74,222,128,0.1))';
+    btn.style.borderColor='var(--green)';
+    btn.style.color='var(--green)';
+    loadAll();
+  } catch(e){
+    toast(e.message,true);
+    btn.disabled=false;
+    btn.textContent='⬆ PROCESS & REPLACE FIREBASE DATA';
+    document.getElementById('xlProg').style.width='0%';
+  }
+};
+
+loadAll();
+</script>
+</body>
+</html>
