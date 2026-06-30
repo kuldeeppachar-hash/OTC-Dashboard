@@ -155,8 +155,8 @@
       </div>
       <div class="prog-bar"><div class="prog-fill" id="xlProg"></div></div>
       <div class="btn-row">
-        <button class="btn btn-amber" id="xlUpBtn" onclick="processAndUpload()" disabled>⬆ PROCESS & REPLACE FIREBASE DATA</button>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);align-self:center">⚠ This replaces all existing data</span>
+        <button class="btn btn-amber" id="xlUpBtn" onclick="processAndUpload()" disabled>⬆ PROCESS & ADD NEW DATA</button>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);align-self:center">✓ Adds new rows only — duplicates auto-skipped, history preserved</span>
       </div>
     </div>
   </div>
@@ -278,6 +278,7 @@
       </div>
       <div class="btn-row">
         <button class="btn btn-green" onclick="saveMeta()">💾 SAVE META</button>
+        <button class="btn btn-red" onclick="resetDedup()">🔄 Reset Upload History (allow re-processing same file)</button>
       </div>
     </div>
   </div>
@@ -497,6 +498,14 @@ window.saveMeta = async function() {
   } catch(e){ toast(e.message,true); }
 };
 
+window.resetDedup = async function() {
+  if (!confirm('This clears upload history tracking only — your existing SO/Stockist/Product/Daily numbers stay untouched. Use this only if you need to re-process a file (e.g. after fixing a wrong SO mapping). Continue?')) return;
+  try {
+    await db.ref('/_processed_lines').remove();
+    toast('✓ Upload history cleared — you can now re-process files without duplicate-skipping');
+  } catch(e){ toast(e.message,true); }
+};
+
 // ── EXCEL UPLOAD ─────────────────────────────────────────────────────────────
 window.handleDrop = function(e) {
   e.preventDefault();
@@ -566,16 +575,50 @@ window.processAndUpload = async function() {
     const buf  = await file.arrayBuffer();
     const wb   = XLSX.read(buf);
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-    setProg(20);
-    toast(`Loaded ${rows.length} rows…`);
+    setProg(15);
+    toast(`Loaded ${rows.length} rows from file…`);
+
+    // ── FETCH EXISTING DATA FIRST (for additive merge) ─────────────────────
+    const existingSnap = await db.ref('/').once('value');
+    const existing = existingSnap.val() || {};
+    const processedLines = existing._processed_lines || {};
+
+    // Rebuild working maps FROM existing Firebase data (so we add to it, not replace it)
+    const soMap={}, prodMap={}, custMap={}, dayMap={};
+    Object.values(existing.so_data||{}).forEach(v=>{ soMap[v.name+'|'+v.zone]={name:v.name,zone:v.zone,amt:v.amt}; });
+    Object.values(existing.product_data||{}).forEach(v=>{ prodMap[v.name]=v.amt; });
+    Object.values(existing.cust_data||{}).forEach(v=>{ custMap[v.name]={name:v.name,so:v.so,zone:v.zone,state:v.state,amt:v.amt}; });
+    Object.values(existing.daily_data||{}).forEach(v=>{
+      // convert display date back to ISO key for matching
+      const d = new Date(v.date.replace(/-/g,' '));
+      if (!isNaN(d)) dayMap[d.toISOString().slice(0,10)] = v.amt;
+    });
+
+    setProg(30);
 
     const STATE_ZONE={'HARYANA':'Delhi/NCR','DELHI':'Delhi/NCR','CHANDIGARH':'Delhi/NCR','RAJASTHAN':'Rajasthan','UTTAR PRADESH':'West UP & UK','UTTARAKHAND':'West UP & UK','PUNJAB':'Punjab'};
-    const soMap={},prodMap={},custMap={},dayMap={};
-    let total=0,lineCount=0,minDate=null,maxDate=null;
+    let newLineCount=0, skippedCount=0, newTotal=0, minDate=null, maxDate=null;
+    const newFingerprints = {};
 
     rows.forEach(r=>{
       const amt=parseFloat(r['Net Amount']||0); if(!amt) return;
-      lineCount++; total+=amt;
+
+      // Build a unique fingerprint per row: date + customer code + product code + amount
+      const rawDate = r['Invoice Date'];
+      let dISO = '';
+      let d = typeof rawDate==='number' ? new Date(Math.round((rawDate-25569)*86400*1000)) : new Date(rawDate);
+      if (!isNaN(d)) dISO = d.toISOString().slice(0,10);
+      const custCode = String(r['Customer Code']||'').trim();
+      const prodCode = String(r['Product Code']||'').trim();
+      const fingerprint = `${dISO}|${custCode}|${prodCode}|${amt}`;
+
+      if (processedLines[fingerprint] || newFingerprints[fingerprint]) {
+        skippedCount++;
+        return; // duplicate — already uploaded before, skip silently
+      }
+      newFingerprints[fingerprint] = true;
+
+      newLineCount++; newTotal+=amt;
       const prod=String(r['Product Description']||'').trim();
       const cust=String(r['Customer Name']||'').trim();
       const state=String(r['State']||'').trim().toUpperCase();
@@ -583,7 +626,7 @@ window.processAndUpload = async function() {
 
       if(prod){ prodMap[prod]=(prodMap[prod]||0)+amt; }
 
-      const partyInfo = window._partyLookup ? window._partyLookup[String(r['Customer Code']||'').trim()] : null;
+      const partyInfo = window._partyLookup ? window._partyLookup[custCode] : null;
       const soName = partyInfo ? partyInfo.so : '';
       const zone2 = partyInfo ? partyInfo.zone : zone;
 
@@ -598,19 +641,23 @@ window.processAndUpload = async function() {
         soMap[soKey].amt+=amt;
       }
 
-      const rawDate=r['Invoice Date'];
-      if(rawDate){
-        let d=typeof rawDate==='number'?new Date(Math.round((rawDate-25569)*86400*1000)):new Date(rawDate);
-        if(!isNaN(d)){
-          const key=d.toISOString().slice(0,10);
-          dayMap[key]=(dayMap[key]||0)+amt;
-          if(!minDate||d<minDate)minDate=d;
-          if(!maxDate||d>maxDate)maxDate=d;
-        }
+      if(dISO){
+        dayMap[dISO]=(dayMap[dISO]||0)+amt;
+        if(!minDate||d<minDate)minDate=d;
+        if(!maxDate||d>maxDate)maxDate=d;
       }
     });
 
-    setProg(50);
+    setProg(60);
+
+    if (newLineCount === 0) {
+      toast(`⚠ All ${skippedCount} rows were already uploaded before — nothing new to add`, true);
+      btn.disabled = false;
+      btn.textContent = '⬆ PROCESS & ADD NEW DATA';
+      setProg(0);
+      return;
+    }
+
     const so_data={}, product_data={}, cust_data={}, daily_data={};
     Object.entries(soMap).forEach(([,v],i)=>{ v.amt=Math.round(v.amt*100)/100; so_data[`so_${i}`]=v; });
     Object.entries(prodMap).forEach(([name,amt],i)=>{product_data[`prod_${i}`]={name,amt:Math.round(amt*100)/100};});
@@ -619,24 +666,32 @@ window.processAndUpload = async function() {
       const d=new Date(key);
       daily_data[`day_${i}`]={date:d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,'-'),amt:Math.round(amt*100)/100};
     });
+
+    // Merge processed-line fingerprints (existing + new)
+    const updatedProcessedLines = Object.assign({}, processedLines);
+    Object.keys(newFingerprints).forEach(fp => { updatedProcessedLines[fp] = true; });
+
+    const grandTotal = Object.values(cust_data).reduce((s,v)=>s+v.amt,0);
+    const allDates = Object.keys(dayMap).sort();
     const meta={
-      period: minDate&&maxDate?`${minDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short'})} → ${maxDate.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}`:'',
-      period_tag: minDate?minDate.toLocaleDateString('en-IN',{month:'short',year:'numeric'}):'',
-      billing_days: Object.keys(dayMap).length,
-      sap_info:`SAP Lines: ${lineCount} · ₹${(total/100000).toFixed(2)}L`,
+      period: allDates.length ? `${new Date(allDates[0]).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})} → ${new Date(allDates[allDates.length-1]).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}` : (existing.meta?.period||''),
+      period_tag: allDates.length ? new Date(allDates[allDates.length-1]).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : (existing.meta?.period_tag||''),
+      billing_days: allDates.length,
+      sap_info:`SAP Lines: ${Object.keys(updatedProcessedLines).length} · ₹${(grandTotal/100000).toFixed(2)}L`,
     };
 
-    setProg(70);
+    setProg(80);
     await Promise.all([
       db.ref('/so_data').set(so_data),
       db.ref('/product_data').set(product_data),
       db.ref('/cust_data').set(cust_data),
       db.ref('/daily_data').set(daily_data),
       db.ref('/meta').set(meta),
+      db.ref('/_processed_lines').set(updatedProcessedLines),
     ]);
     setProg(100);
-    toast(`✓ ${lineCount} lines uploaded · ₹${(total/100000).toFixed(2)}L`);
-    btn.textContent = '✓ UPLOADED!';
+    toast(`✓ Added ${newLineCount} new rows (₹${(newTotal/100000).toFixed(2)}L) · Skipped ${skippedCount} duplicates`);
+    btn.textContent = '✓ DATA ADDED!';
     btn.style.background='linear-gradient(135deg,rgba(74,222,128,0.2),rgba(74,222,128,0.1))';
     btn.style.borderColor='var(--green)';
     btn.style.color='var(--green)';
@@ -644,7 +699,7 @@ window.processAndUpload = async function() {
   } catch(e){
     toast(e.message,true);
     btn.disabled=false;
-    btn.textContent='⬆ PROCESS & REPLACE FIREBASE DATA';
+    btn.textContent='⬆ PROCESS & ADD NEW DATA';
     document.getElementById('xlProg').style.width='0%';
   }
 };
