@@ -174,6 +174,7 @@
         <div style="color:var(--green);margin-top:6px;font-size:11px" id="xlFileName"></div>
       </div>
       <div class="prog-bar"><div class="prog-fill" id="xlProg"></div></div>
+      <div id="unmappedWarning" style="display:none;margin-top:10px;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.35);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;color:var(--red);"></div>
       <div class="btn-row">
         <button class="btn btn-amber" id="xlUpBtn" onclick="processAndUpload()" disabled>⬆ PROCESS & ADD NEW DATA</button>
         <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);align-self:center">✓ Adds new rows only — duplicates auto-skipped, history preserved</span>
@@ -667,8 +668,9 @@ window.processAndUpload = async function() {
     setProg(30);
 
     const STATE_ZONE={'HARYANA':'Delhi/NCR','DELHI':'Delhi/NCR','CHANDIGARH':'Delhi/NCR','RAJASTHAN':'Rajasthan','UTTAR PRADESH':'West UP & UK','UTTARAKHAND':'West UP & UK','PUNJAB':'Punjab'};
-    let newLineCount=0, skippedCount=0, newTotal=0, minDate=null, maxDate=null;
+    let newLineCount=0, skippedCount=0, newTotal=0, unmappedAmt=0, minDate=null, maxDate=null;
     const newFingerprints = {};
+    const unmappedCustomers = {};
 
     rows.forEach(r=>{
       const amt=parseFloat(r['Net Amount']||0); if(!amt) return;
@@ -700,6 +702,11 @@ window.processAndUpload = async function() {
       const partyInfo = partyLookup ? partyLookup[custCode] : null;
       const soName = partyInfo ? partyInfo.so : '';
       const zone2 = partyInfo ? partyInfo.zone : zone;
+
+      if (!partyInfo) {
+        unmappedAmt += amt;
+        unmappedCustomers[cust] = (unmappedCustomers[cust]||0) + amt;
+      }
 
       if(cust){
         if(!custMap[cust]) custMap[cust]={name:cust,so:soName,zone:zone2,state:state.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()),amt:0};
@@ -761,7 +768,18 @@ window.processAndUpload = async function() {
       db.ref('/_processed_lines').set(updatedProcessedLines),
     ]);
     setProg(100);
-    toast(`✓ Added ${newLineCount} new rows (₹${(newTotal/100000).toFixed(2)}L) · Skipped ${skippedCount} duplicates`);
+
+    const unmappedNames = Object.keys(unmappedCustomers);
+    const warnEl = document.getElementById('unmappedWarning');
+    if (unmappedNames.length > 0) {
+      const list = unmappedNames.map(n => `${n} (₹${(unmappedCustomers[n]/1000).toFixed(1)}K)`).join(', ');
+      warnEl.style.display = 'block';
+      warnEl.innerHTML = `⚠ ${unmappedNames.length} customer(s) NOT in your SO mapping — added to totals but with NO SO assigned (₹${(unmappedAmt/100000).toFixed(2)}L unmapped):<br>${list}<br><br>Fix: add these to your Master Data Sheet and re-save the mapping, or accept they'll show as unassigned.`;
+      toast(`⚠ Added ${newLineCount} rows but ${unmappedNames.length} customers had NO SO match — see warning below`, true);
+    } else {
+      warnEl.style.display = 'none';
+      toast(`✓ Added ${newLineCount} new rows (₹${(newTotal/100000).toFixed(2)}L) · Skipped ${skippedCount} duplicates · All customers matched`);
+    }
     btn.textContent = '✓ DATA ADDED!';
     btn.style.background='linear-gradient(135deg,rgba(74,222,128,0.2),rgba(74,222,128,0.1))';
     btn.style.borderColor='var(--green)';
