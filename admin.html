@@ -115,8 +115,9 @@
   </div>
   <div style="display:flex;gap:10px;align-items:center">
     <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="dbStatus">● Connecting...</span>
-    <a href="upload_to_firebase.html" class="nav-link">⬆ Bulk Upload</a>
+    <span style="font-family:var(--mono);font-size:10px;color:var(--text-mid)" id="loggedInAs"></span>
     <a href="dashboard.html" class="nav-link">📊 Dashboard</a>
+    <button class="nav-link" style="cursor:pointer;background:none" onclick="doLogout()">⏻ Logout</button>
   </div>
 </div>
 
@@ -130,28 +131,47 @@
     <div class="kpi-m"><div class="kpi-m-label">SKUs</div><div class="kpi-m-val" id="kProds" style="color:var(--purple)">—</div></div>
   </div>
 
-  <!-- QUICK UPLOAD SECTION -->
+  <!-- SO MASTER MAPPING — rarely updated -->
   <div class="section-divider">
-    <div class="section-divider-label">// BULK UPLOAD NEW EXCEL</div>
+    <div class="section-divider-label">// SO / STOCKIST MASTER MAPPING — update only when SO assignments change</div>
     <div class="section-divider-line"></div>
   </div>
 
   <div class="panel" style="margin-bottom:16px">
     <div class="panel-header">
-      <div class="panel-title"><div class="dot" style="background:var(--amber)"></div>Upload New Month Excel → Auto-push to Firebase</div>
+      <div class="panel-title"><div class="dot" style="background:var(--cyan)"></div>Master Data Sheet (Party List)</div>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="mappingStatus">No mapping saved yet</span>
+    </div>
+    <div class="panel-body">
+      <div class="upload-zone" id="dropZonePartyList" onclick="document.getElementById('partyFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDropParty(event)">
+        <input type="file" id="partyFile" accept=".xlsx,.xls" onchange="handlePartyFile(this.files[0])" style="display:none">
+        📁 Drop Master Data Sheet (Party List with SO Name) here<br>
+        <span style="color:var(--text-dim);font-size:10px">Needs sheet "Party List" with columns: SAP Code, SO Name, State</span>
+        <div style="color:var(--green);margin-top:6px;font-size:11px" id="partyFileName"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-cyan" id="saveMappingBtn" onclick="saveMappingToFirebase()" disabled>💾 SAVE MAPPING TO FIREBASE</button>
+        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);align-self:center">Saved once — reused automatically for every sales upload below</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SALES DATA UPLOAD — frequent -->
+  <div class="section-divider">
+    <div class="section-divider-label">// SALES DATA UPLOAD — use this every time you have new SAP data</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div class="panel" style="margin-bottom:16px">
+    <div class="panel-header">
+      <div class="panel-title"><div class="dot" style="background:var(--amber)"></div>Upload Sales Excel → Auto-push to Firebase</div>
     </div>
     <div class="panel-body">
       <div class="upload-zone" id="dropZone" onclick="document.getElementById('xlFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
         <input type="file" id="xlFile" accept=".xlsx,.xls" onchange="handleXlFile(this.files[0])" style="display:none">
-        📁 Step 1: Drop SAP sales Excel here · or click to browse<br>
+        📁 Drop SAP sales Excel here · or click to browse<br>
         <span style="color:var(--text-dim);font-size:10px">Needs: Customer Code, Customer Name, Product Description, Net Amount, Invoice Date, State</span>
         <div style="color:var(--green);margin-top:6px;font-size:11px" id="xlFileName"></div>
-      </div>
-      <div class="upload-zone" id="dropZonePartyList" onclick="document.getElementById('partyFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDropParty(event)" style="margin-top:10px">
-        <input type="file" id="partyFile" accept=".xlsx,.xls" onchange="handlePartyFile(this.files[0])" style="display:none">
-        📁 Step 2: Drop Master Data Sheet (Party List with SO Name) here<br>
-        <span style="color:var(--text-dim);font-size:10px">Needs sheet "Party List" with columns: SAP Code, SO Name, State</span>
-        <div style="color:var(--green);margin-top:6px;font-size:11px" id="partyFileName"></div>
       </div>
       <div class="prog-bar"><div class="prog-fill" id="xlProg"></div></div>
       <div class="btn-row">
@@ -309,14 +329,21 @@ window.doLogin = function() {
   });
 };
 
+window.doLogout = function() {
+  if (!confirm('Log out of admin panel?')) return;
+  auth.signOut();
+};
+
 auth.onAuthStateChanged(function(user) {
   if (user) {
     document.getElementById('loginGate').classList.add('hide');
     document.getElementById('adminContent').style.display = 'block';
+    document.getElementById('loggedInAs').textContent = '👤 ' + user.email;
     loadAll();
   } else {
     document.getElementById('loginGate').classList.remove('hide');
     document.getElementById('adminContent').style.display = 'none';
+    document.getElementById('loggedInAs').textContent = '';
   }
 });
 
@@ -358,6 +385,15 @@ async function loadAll() {
     document.getElementById('metaTag').value    = meta.period_tag||'';
     document.getElementById('metaPeriod').value = meta.period||'';
     document.getElementById('metaSap').value    = meta.sap_info||'';
+
+    // SO Mapping status
+    const mapping = d._so_mapping;
+    if (mapping && Object.keys(mapping).length) {
+      updateMappingStatus(Object.keys(mapping).length);
+    } else {
+      document.getElementById('mappingStatus').textContent = '⚠ No mapping saved — sales upload will be blocked until you save one';
+      document.getElementById('mappingStatus').style.color = 'var(--amber)';
+    }
   } catch(e) {
     document.getElementById('dbStatus').textContent = '● Error: '+e.message;
     document.getElementById('dbStatus').style.color = 'var(--red)';
@@ -542,12 +578,35 @@ window.handlePartyFile = async function(file) {
         zone: STATE_ZONE[state] || 'Other',
       };
     });
-    window._partyLookup = lookup;
-    toast(`✓ Party List loaded: ${Object.keys(lookup).length} customer mappings`);
+    window._pendingMapping = lookup;
+    document.getElementById('saveMappingBtn').disabled = false;
+    toast(`✓ Party List read: ${Object.keys(lookup).length} mappings — click "Save Mapping" to store it`);
   } catch(e) {
     toast('Party list error: ' + e.message, true);
   }
 };
+
+window.saveMappingToFirebase = async function() {
+  if (!window._pendingMapping) return;
+  const btn = document.getElementById('saveMappingBtn');
+  btn.disabled = true;
+  btn.textContent = 'SAVING...';
+  try {
+    await db.ref('/_so_mapping').set(window._pendingMapping);
+    toast(`✓ SO mapping saved (${Object.keys(window._pendingMapping).length} customers) — used automatically for all future sales uploads`);
+    btn.textContent = '✓ SAVED';
+    updateMappingStatus(Object.keys(window._pendingMapping).length);
+  } catch(e) {
+    toast('Error saving mapping: ' + e.message, true);
+    btn.disabled = false;
+    btn.textContent = '💾 SAVE MAPPING TO FIREBASE';
+  }
+};
+
+function updateMappingStatus(count) {
+  document.getElementById('mappingStatus').textContent = `✓ ${count} customer mappings saved`;
+  document.getElementById('mappingStatus').style.color = 'var(--green)';
+}
 
 window.handleXlFile = function(file) {
   if (!file) return;
@@ -559,10 +618,21 @@ window.handleXlFile = function(file) {
 window.processAndUpload = async function() {
   const file = window._xlFile;
   if (!file) return;
-  if (!window._partyLookup) {
-    toast('Upload Party List file first (Step 2) — SO names need it', true);
+
+  // Load saved SO mapping from Firebase (no need to re-drop Party List each time)
+  let partyLookup;
+  try {
+    const mapSnap = await db.ref('/_so_mapping').once('value');
+    partyLookup = mapSnap.val();
+  } catch(e) {
+    toast('Could not load saved SO mapping: ' + e.message, true);
     return;
   }
+  if (!partyLookup) {
+    toast('No SO mapping saved yet — upload Master Data Sheet above first (one-time setup)', true);
+    return;
+  }
+
   const btn = document.getElementById('xlUpBtn');
   btn.disabled = true;
   btn.textContent = 'PROCESSING...';
@@ -626,7 +696,7 @@ window.processAndUpload = async function() {
 
       if(prod){ prodMap[prod]=(prodMap[prod]||0)+amt; }
 
-      const partyInfo = window._partyLookup ? window._partyLookup[custCode] : null;
+      const partyInfo = partyLookup ? partyLookup[custCode] : null;
       const soName = partyInfo ? partyInfo.so : '';
       const zone2 = partyInfo ? partyInfo.zone : zone;
 
