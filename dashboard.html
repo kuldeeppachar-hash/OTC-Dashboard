@@ -217,6 +217,11 @@
 
 <!-- FILTER BAR -->
 <div class="filter-bar">
+  <span class="filter-label">MONTH //</span>
+  <select id="monthSelect" onchange="switchMonth(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--cyan);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;outline:none">
+    <option value="live">▶ Current (Live)</option>
+  </select>
+  <span style="width:1px;height:18px;background:var(--border2);margin:0 2px"></span>
   <span class="filter-label">VIEW BY //</span>
   <div id="viewByPills" style="display:flex;gap:8px">
     <button class="filter-btn active" onclick="setViewBy('zone',this)">Zone</button>
@@ -384,7 +389,63 @@ let currentViewBy = 'zone';       // 'zone' | 'rsm' | 'zsm'
 let currentFilterValue = 'All';
 const zoneColors = {"Delhi/NCR":"var(--green)","Rajasthan":"var(--amber)","West UP & UK":"var(--cyan)"};
 
-// ===== FIREBASE LISTENERS =====
+// ===== MONTH SWITCHER =====
+let _liveListeners = true;   // true = live Firebase listeners active
+
+async function loadArchiveOptions() {
+  try {
+    const snap = await db.ref('/archive').once('value');
+    const d = snap.val();
+    if (!d) return;
+    const sel = document.getElementById('monthSelect');
+    Object.keys(d).sort((a,b)=>b.localeCompare(a)).forEach(k => {
+      const opt = document.createElement('option');
+      opt.value = k;
+      const tot = d[k].so_data ? Object.values(d[k].so_data).reduce((s,r)=>s+(r.amt||0),0) : 0;
+      opt.textContent = `${k}  (₹${(tot/100000).toFixed(2)}L)`;
+      sel.appendChild(opt);
+    });
+  } catch(e) { console.warn('Archive options load failed:', e); }
+}
+loadArchiveOptions();
+
+window.switchMonth = async function(monthKey) {
+  if (monthKey === 'live') {
+    // Re-attach live listeners if they were detached
+    if (!_liveListeners) {
+      _liveListeners = true;
+      Object.values(_loaded).forEach((_,i,a)=>a[i]=false);
+      _firstLoadDone = false;
+      _watch('so_data',      v => soData      = v ? Object.values(v) : []);
+      _watch('product_data', v => productData = v ? Object.values(v) : []);
+      _watch('cust_data',    v => custData    = v ? Object.values(v) : []);
+      _watch('daily_data',   v => dailyData   = v ? Object.values(v) : []);
+      _watch('meta',         v => meta        = v || {});
+    }
+    return;
+  }
+  // Switch to an archived month — detach live listeners first
+  if (_liveListeners) {
+    db.ref('/so_data').off();
+    db.ref('/product_data').off();
+    db.ref('/cust_data').off();
+    db.ref('/daily_data').off();
+    db.ref('/meta').off();
+    _liveListeners = false;
+  }
+  try {
+    const snap = await db.ref('/archive/'+monthKey).once('value');
+    const d = snap.val() || {};
+    soData      = d.so_data      ? Object.values(d.so_data)      : [];
+    productData = d.product_data ? Object.values(d.product_data) : [];
+    custData    = d.cust_data    ? Object.values(d.cust_data)    : [];
+    dailyData   = d.daily_data   ? Object.values(d.daily_data)   : [];
+    meta        = d.meta         || {};
+    renderAll();
+  } catch(e) { console.error('Archive load failed:', e); }
+};
+
+// ===== FIREBASE LISTENERS (live / current month) =====
 // Per-node listeners — required because current security rules grant .read at
 // individual node paths (so_data, product_data, etc.), not at root. A single
 // db.ref('/').on(...) listener fails with permission_denied under those rules.
