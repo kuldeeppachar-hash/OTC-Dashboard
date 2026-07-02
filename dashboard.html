@@ -65,9 +65,9 @@
 
   .maingrid{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-bottom:16px}
   @media(max-width:980px){.maingrid{grid-template-columns:1fr}}
-  .maingrid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
-  @media(max-width:1200px){.maingrid4{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:640px){.maingrid4{grid-template-columns:1fr}}
+  .maingrid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
+  @media(max-width:1100px){.maingrid3{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:640px){.maingrid3{grid-template-columns:1fr}}
   .bdlist{max-height:280px;overflow-y:auto}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
   .panel h3{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:600;color:var(--cyan);margin:0 0 14px;
@@ -104,6 +104,11 @@
     padding:1px 7px;border-radius:10px;margin-left:6px;font-weight:600}
   .empty{text-align:center;color:var(--muted);padding:40px;font-size:13px}
   footer{text-align:center;color:var(--muted2);font-size:11px;margin-top:30px;font-family:'JetBrains Mono',monospace}
+  *{scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
+  *::-webkit-scrollbar{width:7px;height:7px}
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background:var(--line2);border-radius:10px}
+  *::-webkit-scrollbar-thumb:hover{background:var(--muted2)}
 </style>
 </head>
 <body>
@@ -195,36 +200,18 @@
     </div>
   </div>
 
-  <div class="maingrid4" id="breakdownGrid">
+  <div class="maingrid3" id="breakdownGrid">
     <div class="panel">
-      <h3>SO Wise Sales <button class="tileExport" onclick="exportBreakdownExcel('so')" title="Export SO wise sales">⇩</button></h3>
-      <div id="bdSo" class="bdlist"></div>
+      <h3>SO / HQ Wise Sales <button class="tileExport" onclick="exportSoHqExcel()" title="Export SO/HQ wise sales">⇩</button></h3>
+      <div id="bdSoHq" class="bdlist"></div>
     </div>
     <div class="panel">
-      <h3>HQ Wise Sales <button class="tileExport" onclick="exportBreakdownExcel('hq')" title="Export HQ wise sales">⇩</button></h3>
-      <div id="bdHq" class="bdlist"></div>
-    </div>
-    <div class="panel">
-      <h3>Product Wise Sales <button class="tileExport" onclick="exportBreakdownExcel('pn')" title="Export product wise sales">⇩</button></h3>
+      <h3>Product Wise Sales <button class="tileExport" onclick="exportProductsExcel()" title="Export product wise sales">⇩</button></h3>
       <div id="bdPn" class="bdlist"></div>
     </div>
     <div class="panel">
       <h3>State Wise Sales <button class="tileExport" onclick="exportBreakdownExcel('st')" title="Export state wise sales">⇩</button></h3>
       <div id="bdSt" class="bdlist"></div>
-    </div>
-  </div>
-
-  <div class="gridpanel">
-    <h3>Detail Rows <span class="n" id="rowCount"></span> <button class="tileExport" onclick="exportDetailExcel()" title="Export detail rows">⇩</button></h3>
-    <div class="tablewrap">
-      <table id="detailTable">
-        <thead><tr>
-          <th data-k="d">Date</th><th data-k="so">SO</th><th data-k="hq">Area</th><th data-k="st">State</th>
-          <th data-k="cn">Party</th><th data-k="pn">Product</th><th data-k="cat">Category</th>
-          <th class="num" data-k="q">Qty</th><th class="num" data-k="na">Net Sale</th>
-        </tr></thead>
-        <tbody id="detailBody"></tbody>
-      </table>
     </div>
   </div>
 
@@ -255,6 +242,26 @@ const QUARTERS = {
 const FY_MONTHS = [...QUARTERS.Q1,...QUARTERS.Q2,...QUARTERS.Q3,...QUARTERS.Q4];
 
 let monthsMeta = {};       // key -> {rowCount, netTotal, importedAt}
+let MASTER = { products:{}, parties:{}, team:{} };
+let ALL_SO_HQ = [];   // [{so, hq}]
+let ALL_PRODUCTS = []; // [{code, name}]
+
+async function loadMaster(){
+  const snap = await get(ref(db,'master'));
+  if(!snap.exists()) return;
+  MASTER = snap.val();
+  MASTER.parties = MASTER.parties || {};
+  MASTER.products = MASTER.products || {};
+  const soMap = {};
+  Object.values(MASTER.parties).forEach(p=>{
+    const so = (p.so || 'UNMAPPED').toString().trim();
+    if(so === 'UNMAPPED') return;
+    if(!soMap[so]) soMap[so] = p.hq || '';
+  });
+  ALL_SO_HQ = Object.entries(soMap).map(([so,hq])=>({so,hq})).sort((a,b)=>a.so.localeCompare(b.so));
+  ALL_PRODUCTS = Object.entries(MASTER.products).map(([code,p])=>({code, name:p.name||code})).sort((a,b)=>a.name.localeCompare(b.name));
+}
+
 let cache = {};            // key -> array of records
 let state = {
   period:'month', month:null, quarter:'Q1', quarterMonth:'ALL', customFrom:null, customTo:null,
@@ -359,7 +366,6 @@ async function refresh(){
   renderTrend(filtered);
   renderLeaderboard(filtered);
   renderBreakdowns(filtered);
-  renderDetail(filtered);
 }
 
 function fmtINR(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
@@ -480,39 +486,69 @@ function renderBdPanel(elId, rows, key){
   `).join('');
 }
 
+// Full SO/HQ roster (from master), seeded with zero, overlaid with actual sales
+function soHqRows(rows){
+  const net = {}, qty = {};
+  rows.forEach(r=>{
+    net[r.so] = (net[r.so]||0) + r.na;
+    qty[r.so] = (qty[r.so]||0) + r.q;
+  });
+  const roster = ALL_SO_HQ.length ? ALL_SO_HQ : Object.keys(net).map(so=>({so, hq: rows.find(r=>r.so===so)?.hq || ''}));
+  return roster.map(({so,hq})=>({so, hq, net: net[so]||0, qty: qty[so]||0}))
+    .sort((a,b)=>b.net-a.net);
+}
+
+function renderSoHq(rows){
+  const list = soHqRows(rows);
+  const max = list.length ? Math.max(...list.map(r=>r.net),1) : 1;
+  const box = document.getElementById('bdSoHq');
+  if(!list.length){ box.innerHTML='<div class="empty">No SO/HQ master data loaded — upload master data in admin.html first.</div>'; return; }
+  box.innerHTML = list.map((r,i)=>`
+    <div class="lbrow">
+      <div class="lbrank">${String(i+1).padStart(2,'0')}</div>
+      <div class="lbname">
+        <span class="n">${r.so}${r.hq?' <span class="sub" style="color:var(--muted)">· '+r.hq+'</span>':''}</span>
+        <div class="lbbar"><i style="width:${Math.max(r.net?2:0,100*r.net/max)}%"></i></div>
+      </div>
+      <div class="lbval">${fmtINR(r.net)}<span class="sub">${r.qty.toLocaleString('en-IN')} units</span></div>
+    </div>
+  `).join('');
+}
+
+// Full product roster (from master), seeded with zero, overlaid with actual sales
+function productRows(rows){
+  const net = {}, qty = {};
+  rows.forEach(r=>{
+    net[r.pn] = (net[r.pn]||0) + r.na;
+    qty[r.pn] = (qty[r.pn]||0) + r.q;
+  });
+  const roster = ALL_PRODUCTS.length ? ALL_PRODUCTS : Object.keys(net).map(name=>({code:'', name}));
+  return roster.map(({name})=>({name, net: net[name]||0, qty: qty[name]||0}))
+    .sort((a,b)=>b.net-a.net);
+}
+
+function renderProducts(rows){
+  const list = productRows(rows);
+  const max = list.length ? Math.max(...list.map(r=>r.net),1) : 1;
+  const box = document.getElementById('bdPn');
+  if(!list.length){ box.innerHTML='<div class="empty">No product master data loaded — upload master data in admin.html first.</div>'; return; }
+  box.innerHTML = list.map((r,i)=>`
+    <div class="lbrow">
+      <div class="lbrank">${String(i+1).padStart(2,'0')}</div>
+      <div class="lbname">
+        <span class="n">${r.name}</span>
+        <div class="lbbar"><i style="width:${Math.max(r.net?2:0,100*r.net/max)}%"></i></div>
+      </div>
+      <div class="lbval">${fmtINR(r.net)}<span class="sub">${r.qty.toLocaleString('en-IN')} units</span></div>
+    </div>
+  `).join('');
+}
+
 function renderBreakdowns(rows){
-  renderBdPanel('bdSo', rows, 'so');
-  renderBdPanel('bdHq', rows, 'hq');
-  renderBdPanel('bdPn', rows, 'pn');
+  renderSoHq(rows);
+  renderProducts(rows);
   renderBdPanel('bdSt', rows, 'st');
 }
-
-let sortKey='d', sortDir=-1;
-function renderDetail(rows){
-  document.getElementById('rowCount').textContent = `${rows.length.toLocaleString('en-IN')} rows`;
-  const sorted = [...rows].sort((a,b)=>{
-    let av=a[sortKey], bv=b[sortKey];
-    if(typeof av==='string') return sortDir*av.localeCompare(bv);
-    return sortDir*((av||0)-(bv||0));
-  }).slice(0,500);
-  const body = document.getElementById('detailBody');
-  if(!sorted.length){ body.innerHTML = '<tr><td colspan="9" class="empty">No rows match the current filters.</td></tr>'; return; }
-  body.innerHTML = sorted.map(r=>`
-    <tr>
-      <td>${r.d}</td>
-      <td>${r.so}</td>
-      <td>${r.hq}</td><td>${r.st}</td><td>${r.cn}</td><td>${r.pn}</td><td>${r.cat}</td>
-      <td class="num">${r.q}</td><td class="num">${fmtINR(r.na)}</td>
-    </tr>`).join('') + (rows.length>500 ? `<tr><td colspan="9" class="empty">Showing first 500 of ${rows.length.toLocaleString('en-IN')} rows — refine filters or use Export for the full set.</td></tr>` : '');
-}
-
-document.querySelectorAll('#detailTable thead th').forEach(th=>{
-  th.addEventListener('click', ()=>{
-    const k = th.dataset.k;
-    if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=1; }
-    renderDetail(currentRows);
-  });
-});
 
 // ---- controls wiring ----
 document.querySelectorAll('#periodTabs .tab').forEach(t=>{
@@ -583,6 +619,28 @@ window.exportBreakdownExcel = function(key){
   XLSX.writeFile(wb, `PIL_OTC_${VIEW_LABELS[key].replace(/\s/g,'')}Wise_${periodLabelStr()}.xlsx`);
 };
 
+window.exportSoHqExcel = function(){
+  const list = soHqRows(currentRows);
+  if(!list.length){ alert('No SO/HQ master data loaded.'); return; }
+  const totalNet = list.reduce((a,r)=>a+r.net,0);
+  const rows = list.map((r,i)=>({Rank:i+1, SO:r.so, HQ:r.hq, Quantity:Math.round(r.qty), 'Net Sale':Math.round(r.net),
+    '% of Total':totalNet ? (100*r.net/totalNet).toFixed(2)+'%' : '0%'}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'SO HQ Wise Sales');
+  XLSX.writeFile(wb, `PIL_OTC_SO_HQ_Wise_${periodLabelStr()}.xlsx`);
+};
+
+window.exportProductsExcel = function(){
+  const list = productRows(currentRows);
+  if(!list.length){ alert('No product master data loaded.'); return; }
+  const totalNet = list.reduce((a,r)=>a+r.net,0);
+  const rows = list.map((r,i)=>({Rank:i+1, Product:r.name, Quantity:Math.round(r.qty), 'Net Sale':Math.round(r.net),
+    '% of Total':totalNet ? (100*r.net/totalNet).toFixed(2)+'%' : '0%'}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Product Wise Sales');
+  XLSX.writeFile(wb, `PIL_OTC_Product_Wise_${periodLabelStr()}.xlsx`);
+};
+
 window.exportLeaderboardExcel = function(){
   if(!currentRows.length){ alert('No data to export for the current filters.'); return; }
   const key = state.viewBy;
@@ -599,18 +657,6 @@ window.exportLeaderboardExcel = function(){
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), `Leaderboard ${VIEW_LABELS[key]}`.slice(0,31));
   XLSX.writeFile(wb, `PIL_OTC_Leaderboard_${VIEW_LABELS[key].replace(/\s/g,'')}_${periodLabelStr()}.xlsx`);
-};
-
-window.exportDetailExcel = function(){
-  if(!currentRows.length){ alert('No data to export for the current filters.'); return; }
-  const rows = currentRows.map(r=>({
-    Date:r.d, SO:r.so, Mapped:r.mapped?'Yes':'No', ASM:r.asm, RSM:r.rsm, ZSM:r.zsm,
-    Area_HQ:r.hq, State:r.st, Party:r.cn, CustomerCode:r.cc,
-    Product:r.pn, ProductCode:r.pc, Category:r.cat, Quantity:r.q, NetSale:Math.round(r.na)
-  }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Detail Rows');
-  XLSX.writeFile(wb, `PIL_OTC_Detail_${periodLabelStr()}.xlsx`);
 };
 
 window.exportExcel = function(){
@@ -649,6 +695,7 @@ window.exportExcel = function(){
 };
 
 (async function init(){
+  await loadMaster();
   await loadMonthsMeta();
   await refresh();
   setInterval(async ()=>{ await loadMonthsMeta(); }, 5*60*1000);
