@@ -362,10 +362,11 @@ async function refresh(){
   });
 
   currentRows = filtered;
-  renderKPIs(filtered);
-  renderTrend(filtered);
-  renderLeaderboard(filtered);
-  renderBreakdowns(filtered);
+  const safe = (fn,label) => { try{ fn(); }catch(e){ console.error('Render failed:',label,e); } };
+  safe(()=>renderKPIs(filtered),'KPIs');
+  safe(()=>renderTrend(filtered),'Trend');
+  safe(()=>renderLeaderboard(filtered),'Leaderboard');
+  safe(()=>renderBreakdowns(filtered),'Breakdowns');
 }
 
 function fmtINR(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
@@ -407,38 +408,47 @@ function renderTrend(rows){
   const svg = document.getElementById('trendSvg');
   document.getElementById('trendRange').textContent = days.length ? `${days[0]} → ${days[days.length-1]}` : '';
   if(!days.length){ svg.innerHTML=''; document.getElementById('trendMin').textContent=''; document.getElementById('trendMax').textContent=''; return; }
-  const vals = days.map(d=>byDay[d]);
-  const max = Math.max(...vals, 1);
-  const W=900, H=230, padTop=10, padBottom=6, labelH=30, padSide=6;
-  const plotH = H - padTop - padBottom;
-  const n = days.length;
-  const slot = (W - padSide*2) / n;
-  const barW = Math.max(1, Math.min(slot*0.62, 34));
-  // Thin out date labels so they don't overlap when there are many days
-  const maxLabels = 16;
-  const labelStep = Math.max(1, Math.ceil(n / maxLabels));
+
+  // Bucket days into calendar weeks (7-day blocks starting from the first day in range)
+  const first = new Date(days[0]);
+  const weeks = [];
+  days.forEach(d=>{
+    const diffDays = Math.floor((new Date(d) - first) / 86400000);
+    const wIdx = Math.floor(diffDays / 7);
+    weeks[wIdx] = weeks[wIdx] || { days: [], net: 0 };
+    weeks[wIdx].days.push(d);
+    weeks[wIdx].net += byDay[d];
+  });
+  const weekList = weeks.map((w,i)=> w ? {idx:i, ...w} : null).filter(Boolean);
+
+  const vals = weekList.map(w=>w.net);
+  const max = Math.max(...vals), min = Math.min(...vals,0);
+  const W=900,H=230,padTop=10,padBottom=6,labelH=34,padSide=30;
+  const n = weekList.length;
+  const pts = weekList.map((w,i)=>{
+    const x = padSide + (n>1 ? (i/(n-1))*(W-2*padSide) : (W-2*padSide)/2);
+    const y = H-padBottom - ((w.net-min)/((max-min)||1))*(H-padTop-padBottom);
+    return [x,y];
+  });
+  const linePath = pts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const areaPath = linePath + ` L${pts[pts.length-1][0].toFixed(1)},${H-padBottom} L${pts[0][0].toFixed(1)},${H-padBottom} Z`;
   const shortDate = d => { const [y,m,dd] = d.split('-'); return `${dd}/${m}`; };
-  const bars = days.map((d,i)=>{
-    const cx = padSide + slot*i + slot/2;
-    const barH = (byDay[d]/max) * plotH;
-    const x = cx - barW/2;
-    const y = padTop + (plotH - barH);
-    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${barH.toFixed(1)}" rx="2" fill="url(#barGrad)"><title>${d}: ${fmtINR(byDay[d])}</title></rect>`;
-  }).join('');
-  const labels = days.map((d,i)=>{
-    if(i % labelStep !== 0 && i !== n-1) return '';
-    const cx = padSide + slot*i + slot/2;
-    return `<text x="${cx.toFixed(1)}" y="${H+labelH-8}" font-size="10" fill="#71809A" text-anchor="middle" font-family="JetBrains Mono, monospace">${shortDate(d)}</text>`;
+  const labels = weekList.map((w,i)=>{
+    const range = `${shortDate(w.days[0])}–${shortDate(w.days[w.days.length-1])}`;
+    return `<text x="${pts[i][0].toFixed(1)}" y="${H+16}" font-size="10.5" font-weight="600" fill="#EAEEF5" text-anchor="middle" font-family="JetBrains Mono, monospace">Week ${w.idx+1}</text>
+            <text x="${pts[i][0].toFixed(1)}" y="${H+29}" font-size="9.5" fill="#71809A" text-anchor="middle" font-family="JetBrains Mono, monospace">${range}</text>`;
   }).join('');
   svg.innerHTML = `
     <defs>
-      <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#00E5FF"/>
-        <stop offset="100%" stop-color="#0891A8"/>
+      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#00E5FF" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#00E5FF" stop-opacity="0"/>
       </linearGradient>
     </defs>
-    <line x1="${padSide}" y1="${H-padBottom}" x2="${W-padSide}" y2="${H-padBottom}" stroke="#1D2635" stroke-width="1"/>
-    ${bars}
+    <path d="${areaPath}" fill="url(#areaGrad)"/>
+    <path d="${linePath}" fill="none" stroke="#00E5FF" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"
+      style="filter:drop-shadow(0 0 6px rgba(0,229,255,.6))"/>
+    ${pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="#00E5FF" opacity="0.9"><title>Week ${weekList[i].idx+1}: ${fmtINR(weekList[i].net)}</title></circle>`).join('')}
     ${labels}
   `;
   document.getElementById('trendMin').textContent = 'Low: ' + fmtINR(min<0?0:min);
