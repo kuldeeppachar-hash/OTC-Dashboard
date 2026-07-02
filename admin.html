@@ -2,368 +2,147 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PIL OTC — Admin Panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PIL OTC — Admin Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-  :root{--bg:#060a12;--surface:#0d1520;--surface2:#111c2e;--border:rgba(56,189,248,0.15);--border2:rgba(56,189,248,0.07);--cyan:#38bdf8;--green:#4ade80;--red:#f87171;--amber:#fbbf24;--purple:#a78bfa;--text:#e2e8f0;--text-dim:#64748b;--text-mid:#94a3b8;--mono:'JetBrains Mono',monospace;--sans:'Space Grotesk',sans-serif;}
-  *{box-sizing:border-box;margin:0;padding:0;}
-  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;min-height:100vh;}
-  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(56,189,248,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
-  .header{background:rgba(6,10,18,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;}
-  .header-left{display:flex;align-items:center;gap:14px;}
-  .logo-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--amber),var(--red));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#000;}
-  .logo-text{font-size:15px;font-weight:600;}
-  .logo-text span{color:var(--amber);}
-  .header-tag{background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.25);color:var(--amber);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:4px;}
-  .nav-link{color:var(--text-dim);font-family:var(--mono);font-size:11px;text-decoration:none;padding:4px 10px;border-radius:6px;border:1px solid var(--border2);transition:all 0.15s;}
-  .nav-link:hover{border-color:var(--cyan);color:var(--cyan);}
-  main{position:relative;z-index:1;padding:24px;max-width:1200px;margin:0 auto;}
-  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
-  .panel{background:var(--surface);border:1px solid var(--border2);border-radius:12px;overflow:hidden;}
-  .panel-header{padding:14px 18px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;}
-  .panel-title{font-size:11px;font-weight:600;color:var(--text-mid);font-family:var(--mono);letter-spacing:0.5px;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
-  .dot{width:6px;height:6px;border-radius:50%;}
-  .panel-body{padding:16px 18px;}
-  label{display:block;font-size:10px;font-family:var(--mono);color:var(--text-dim);letter-spacing:0.5px;margin-bottom:5px;margin-top:12px;}
-  label:first-child{margin-top:0;}
-  input,select,textarea{width:100%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-family:var(--mono);font-size:12px;padding:8px 10px;border-radius:6px;outline:none;transition:border-color 0.15s;}
-  input:focus,select:focus,textarea:focus{border-color:var(--cyan);}
-  textarea{resize:vertical;min-height:80px;}
-  .row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-  .row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
-  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:7px;border:none;cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:0.3px;transition:all 0.2s;}
-  .btn-cyan{background:rgba(56,189,248,0.15);border:1px solid rgba(56,189,248,0.35);color:var(--cyan);}
-  .btn-cyan:hover{background:rgba(56,189,248,0.25);}
-  .btn-green{background:rgba(74,222,128,0.15);border:1px solid rgba(74,222,128,0.35);color:var(--green);}
-  .btn-green:hover{background:rgba(74,222,128,0.25);}
-  .btn-red{background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.3);color:var(--red);}
-  .btn-red:hover{background:rgba(248,113,113,0.2);}
-  .btn-amber{background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.3);color:var(--amber);}
-  .btn-amber:hover{background:rgba(251,191,36,0.2);}
-  .btn-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
-  .item-list{margin-top:12px;max-height:280px;overflow-y:auto;}
-  .item-list::-webkit-scrollbar{width:3px;}
-  .item-list::-webkit-scrollbar-thumb{background:var(--border);}
-  .item-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid var(--border2);font-size:11px;font-family:var(--mono);}
-  .item-row:last-child{border-bottom:none;}
-  .item-row:hover{background:rgba(56,189,248,0.03);}
-  .item-name{flex:1;color:var(--text-mid);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .item-amt{color:var(--cyan);width:80px;text-align:right;}
-  .item-zone{font-size:10px;padding:2px 6px;border-radius:4px;}
-  .zone-DL{background:rgba(74,222,128,0.12);color:var(--green);}
-  .zone-RJ{background:rgba(251,191,36,0.12);color:var(--amber);}
-  .zone-UP{background:rgba(56,189,248,0.12);color:var(--cyan);}
-  .zone-PB{background:rgba(248,113,113,0.12);color:var(--red);}
-  .zone-OT{background:rgba(167,139,250,0.12);color:var(--purple);}
-  .del-btn{background:none;border:none;color:var(--text-dim);cursor:pointer;padding:2px 6px;border-radius:4px;font-size:11px;}
-  .del-btn:hover{background:rgba(248,113,113,0.15);color:var(--red);}
-  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:12px;padding:10px 20px;border-radius:8px;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;}
-  .toast.show{opacity:1;}
-  .toast.err{border-color:var(--red);color:var(--red);}
-  .kpi-mini{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
-  .kpi-m{background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:14px 16px;}
-  .kpi-m-label{font-size:9px;font-family:var(--mono);color:var(--text-dim);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:6px;}
-  .kpi-m-val{font-size:20px;font-weight:700;letter-spacing:-0.5px;}
-  .upload-zone{border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all 0.2s;font-family:var(--mono);font-size:11px;color:var(--text-dim);}
-  .upload-zone:hover,.upload-zone.drag{border-color:var(--cyan);background:rgba(56,189,248,0.04);color:var(--cyan);}
-  .prog-bar{height:3px;background:var(--border2);border-radius:2px;margin-top:10px;overflow:hidden;}
-  .prog-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--green));transition:width 0.3s;width:0%;}
-  .section-divider{display:flex;align-items:center;gap:12px;margin:20px 0 14px;}
-  .section-divider-label{font-size:9px;font-family:var(--mono);color:var(--text-dim);text-transform:uppercase;letter-spacing:1.5px;white-space:nowrap;}
-  .section-divider-line{flex:1;height:1px;background:var(--border2);}
-</style>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<style>
-  #loginGate{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
-  #loginGate.hide{display:none;}
-  .login-box{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:34px;width:320px;}
-  .login-box h2{font-size:16px;color:var(--amber);margin-bottom:4px;}
-  .login-box p{font-size:11px;color:var(--text-dim);margin-bottom:20px;font-family:var(--mono);}
-  .login-box input{margin-bottom:10px;}
-  .login-box button{width:100%;margin-top:8px;padding:10px;background:linear-gradient(135deg,var(--amber),var(--red));border:none;border-radius:8px;color:#000;font-family:var(--mono);font-weight:700;font-size:12px;cursor:pointer;}
-  .login-err{color:var(--red);font-size:11px;font-family:var(--mono);margin-top:10px;min-height:14px;}
-  #adminApp{display:none;}
-  #adminApp.show{display:block;}
+  :root{
+    --bg:#0A0E14; --panel:#0F1520; --panel2:#141B29; --line:#212B3B;
+    --cyan:#00E5FF; --amber:#FFB020; --green:#34D399; --red:#F87171;
+    --text:#E8EDF4; --muted:#7A8699;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh}
+  .wrap{max-width:1100px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:28px;letter-spacing:.5px;margin:0 0 4px;
+     background:linear-gradient(90deg,#fff,var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:28px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-bottom:20px}
+  .card h2{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:600;margin:0 0 4px;color:var(--cyan)}
+  .card p.desc{color:var(--muted);font-size:13px;margin:0 0 16px;line-height:1.5}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+  input[type=email],input[type=password],input[type=file]{
+    width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--text);
+    padding:10px 12px;font-size:14px;font-family:'Inter',sans-serif;margin-bottom:14px
+  }
+  input[type=file]{padding:8px}
+  button{
+    background:var(--cyan);color:#00212A;border:none;border-radius:8px;padding:11px 20px;font-weight:700;
+    font-size:13px;letter-spacing:.3px;cursor:pointer;font-family:'Inter',sans-serif;transition:.15s
+  }
+  button:hover{filter:brightness(1.12)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+  button.danger{background:var(--red);color:#2A0000}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .status{font-size:12.5px;margin-top:10px;padding:10px 12px;border-radius:8px;display:none;font-family:'JetBrains Mono',monospace}
+  .status.show{display:block}
+  .status.ok{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:var(--green)}
+  .status.err{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);color:var(--red)}
+  .status.info{background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.25);color:var(--cyan)}
+  table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:600;text-transform:uppercase;font-size:11px;letter-spacing:.4px}
+  td.num{font-family:'JetBrains Mono',monospace;text-align:right}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+  .pill.ok{background:rgba(52,211,153,.15);color:var(--green)}
+  .pill.warn{background:rgba(255,176,32,.15);color:var(--amber)}
+  .locked{opacity:.35;pointer-events:none;filter:grayscale(.4)}
+  #loginGate{max-width:380px;margin:80px auto}
+  .divider{border-top:1px solid var(--line);margin:20px 0}
+  .small{font-size:11.5px;color:var(--muted);line-height:1.6}
+  .badge-live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+  .dot.on{background:var(--green);box-shadow:0 0 8px var(--green)}
+  a{color:var(--cyan)}
 </style>
 </head>
 <body>
+<div class="wrap">
 
+  <div id="loginGate" class="card">
+    <h2>Admin Sign-in</h2>
+    <p class="desc">Writes to this database require authentication. Use the account you created in Firebase Console → Authentication.</p>
+    <label>Email</label>
+    <input type="email" id="loginEmail" placeholder="you@pilindia.in">
+    <label>Password</label>
+    <input type="password" id="loginPass" placeholder="••••••••">
+    <button onclick="doLogin()">Sign in</button>
+    <div id="loginStatus" class="status"></div>
+    <div class="divider"></div>
+    <p class="small">No admin account yet? In the Firebase Console: Build → Authentication → Sign-in method → enable <b>Email/Password</b> → Users tab → Add user. Use that email/password here.</p>
+  </div>
 
-<div class="toast" id="toast"></div>
+  <div id="mainApp" style="display:none">
+    <h1>PIL OTC — ADMIN CONSOLE</h1>
+    <div class="sub">
+      <span class="badge-live"><span class="dot on" id="connDot"></span> <span id="whoami"></span></span>
+      &nbsp;·&nbsp; <a href="#" onclick="doLogout();return false;">Sign out</a>
+    </div>
 
-<div id="loginGate">
-  <div class="login-box">
-    <h2>⚙ Admin Login Required</h2>
-    <p>// Sign in to edit PIL OTC data</p>
-    <label>EMAIL</label>
-    <input id="loginEmail" type="email" placeholder="you@example.com">
-    <label>PASSWORD</label>
-    <input id="loginPass" type="password" placeholder="••••••••">
-    <button onclick="doLogin()">SIGN IN</button>
-    <div class="login-err" id="loginErr"></div>
+    <div class="card">
+      <h2>1 · Master Data</h2>
+      <p class="desc">Upload <code>New_Master_Data_SHeet.xlsx</code> (Party List, Product List, Team List sheets). Re-upload any time to update — this replaces the current master in Firebase.</p>
+      <label>Master data file (.xlsx)</label>
+      <input type="file" id="masterFile" accept=".xlsx,.xls">
+      <div class="row">
+        <button onclick="handleMasterUpload()">Parse &amp; Push Master Data</button>
+        <span id="masterCount" class="small"></span>
+      </div>
+      <div id="masterStatus" class="status"></div>
+    </div>
+
+    <div class="card">
+      <h2>2 · Monthly Sales Import</h2>
+      <p class="desc">Upload a raw SAP billing export (any month, either column format — auto-detected). Rows are filtered to OTC product codes only, joined to Party List for SO name, and rolled up by HQ/State from the file itself. Master data must be loaded first.</p>
+      <label>Monthly sales file (.xlsx)</label>
+      <input type="file" id="salesFile" accept=".xlsx,.xls">
+      <div class="row">
+        <button onclick="handleSalesParse()">Parse File</button>
+      </div>
+      <div id="parseStatus" class="status"></div>
+      <div id="previewBox" style="display:none">
+        <div class="divider"></div>
+        <table>
+          <tr><th>Detected Month</th><td id="pvMonth">—</td></tr>
+          <tr><th>Format</th><td id="pvFormat">—</td></tr>
+          <tr><th>Total rows in file</th><td id="pvTotal">—</td></tr>
+          <tr><th>OTC-matched rows</th><td id="pvOtc">—</td></tr>
+          <tr><th>Net Sale (OTC)</th><td id="pvNet">—</td></tr>
+          <tr><th>SO-mapped rows</th><td id="pvMapped">—</td></tr>
+          <tr><th>Unmapped rows <span class="small">(customer not in Party List)</span></th><td id="pvUnmapped">—</td></tr>
+        </table>
+        <div class="row" style="margin-top:16px">
+          <button onclick="pushMonthToFirebase()" id="pushBtn">Push this month to Firebase</button>
+          <button class="ghost" onclick="downloadUnmapped()">Download unmapped rows (Excel)</button>
+        </div>
+        <div id="pushStatus" class="status"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>3 · Months in Database</h2>
+      <div class="row"><button class="ghost" onclick="loadMonthsList()">Refresh list</button></div>
+      <table id="monthsTable">
+        <thead><tr><th>Month</th><th class="num">Rows</th><th class="num">Net Sale</th><th>Imported</th><th></th></tr></thead>
+        <tbody id="monthsBody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
-<div id="adminContent" style="display:none">
-<div class="header">
-  <div class="header-left">
-    <div class="logo-mark">⚙</div>
-    <div class="logo-text">PIL <span>OTC</span> Admin</div>
-    <div class="header-tag">DATA MANAGER</div>
-  </div>
-  <div style="display:flex;gap:10px;align-items:center">
-    <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="dbStatus">● Connecting...</span>
-    <span style="font-family:var(--mono);font-size:10px;color:var(--text-mid)" id="loggedInAs"></span>
-    <a href="dashboard.html" class="nav-link">📊 Dashboard</a>
-    <button class="nav-link" style="cursor:pointer;background:none" onclick="doLogout()">⏻ Logout</button>
-  </div>
-</div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getDatabase, ref, set, get, remove, child
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-<main>
-
-  <!-- KPI ROW -->
-  <div class="kpi-mini" id="kpiMini">
-    <div class="kpi-m"><div class="kpi-m-label">Total Sales</div><div class="kpi-m-val" id="kTotal" style="color:var(--cyan)">—</div></div>
-    <div class="kpi-m"><div class="kpi-m-label">SOs Active</div><div class="kpi-m-val" id="kSOs" style="color:var(--green)">—</div></div>
-    <div class="kpi-m"><div class="kpi-m-label">Stockists</div><div class="kpi-m-val" id="kCust" style="color:var(--amber)">—</div></div>
-    <div class="kpi-m"><div class="kpi-m-label">SKUs</div><div class="kpi-m-val" id="kProds" style="color:var(--purple)">—</div></div>
-  </div>
-
-  <!-- SO MASTER MAPPING — rarely updated -->
-  <div class="section-divider">
-    <div class="section-divider-label">// SO / STOCKIST MASTER MAPPING — update only when SO assignments change</div>
-    <div class="section-divider-line"></div>
-  </div>
-
-  <div class="panel" style="margin-bottom:16px">
-    <div class="panel-header">
-      <div class="panel-title"><div class="dot" style="background:var(--cyan)"></div>Master Data Sheet (Party List + Product List)</div>
-      <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="mappingStatus">No mapping saved yet</span>
-    </div>
-    <div class="panel-body">
-      <div class="upload-zone" id="dropZonePartyList" onclick="document.getElementById('partyFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDropParty(event)">
-        <input type="file" id="partyFile" accept=".xlsx,.xls" onchange="handlePartyFile(this.files[0])" style="display:none">
-        📁 Drop Master Data Sheet here (must contain "Party List" and "Product List" sheets)<br>
-        <span style="color:var(--text-dim);font-size:10px">Party List needs: SAP Code, SO Name, State · Product List needs: Item Code</span>
-        <div style="color:var(--green);margin-top:6px;font-size:11px" id="partyFileName"></div>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-cyan" id="saveMappingBtn" onclick="saveMappingToFirebase()" disabled>💾 SAVE MAPPING TO FIREBASE</button>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);align-self:center">Saved once — reused automatically for every sales upload below. Both customer AND product codes are checked against this.</span>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-amber" id="backfillBtn" onclick="backfillHierarchy()">🔄 RE-APPLY HIERARCHY TO EXISTING SO DATA</button>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);align-self:center">Use this if ASM/RSM/ZSM show "Unassigned" on the dashboard — stamps the saved hierarchy mapping onto SOs already in the database, without needing a new sales upload.</span>
-      </div>
-      <div id="backfillResult" style="display:none;margin-top:10px;font-family:var(--mono);font-size:11px;line-height:1.7;padding:10px 12px;border-radius:8px;"></div>
-    </div>
-  </div>
-
-  <!-- UPLOAD PREVIEW / CONFIRM MODAL -->
-  <div id="previewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9998;align-items:center;justify-content:center;">
-    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;max-width:600px;width:90%;max-height:80vh;overflow-y:auto;">
-      <h3 style="color:var(--amber);font-size:15px;margin-bottom:6px;font-family:var(--mono)">⚠ Confirm This Upload</h3>
-      <p style="color:var(--text-dim);font-size:11px;font-family:var(--mono);margin-bottom:16px">Check this is the right file before it touches your live dashboard.</p>
-      <div id="previewContent" style="font-family:var(--mono);font-size:11px;color:var(--text-mid);line-height:1.8;"></div>
-      <div style="display:flex;gap:10px;margin-top:20px;">
-        <button class="btn btn-green" onclick="confirmUpload()" style="flex:1">✓ YES, THIS IS CORRECT — UPLOAD</button>
-        <button class="btn btn-red" onclick="cancelUpload()" style="flex:1">✕ CANCEL</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- MONTH-END ARCHIVE -->
-  <div class="section-divider">
-    <div class="section-divider-label">// MONTH-END — archive & start fresh</div>
-    <div class="section-divider-line"></div>
-  </div>
-  <div class="panel" style="margin-bottom:16px">
-    <div class="panel-header">
-      <div class="panel-title"><div class="dot" style="background:var(--amber)"></div>Archive Current Month & Start Fresh</div>
-      <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">Run once at month-end · old data stays accessible on dashboard</span>
-    </div>
-    <div class="panel-body">
-      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);line-height:1.8;margin-bottom:12px">
-        Saves current SO/Stockist/Product/Daily/Meta data to <span style="color:var(--amber)">/archive/{month}</span>, then clears the live nodes so the next month starts at zero. Master mapping, hierarchy, and dedup history stay intact. The dashboard will show both current and all archived months via a month switcher.<br>
-        <span style="color:var(--red)">⚠ Run only once at month-end — not mid-month.</span>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-amber" id="archiveBtn" onclick="archiveCurrentMonth()">📦 ARCHIVE CURRENT MONTH & START FRESH</button>
-      </div>
-      <div id="archiveResult" style="display:none;margin-top:10px;font-family:var(--mono);font-size:11px;line-height:1.7;padding:10px 12px;border-radius:8px;"></div>
-      <div style="margin-top:14px">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim);margin-bottom:6px">ARCHIVED MONTHS //</div>
-        <div id="archiveList" style="font-family:var(--mono);font-size:11px;color:var(--text-mid)">Loading...</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- SALES DATA UPLOAD — frequent -->
-  <div class="section-divider">
-    <div class="section-divider-label">// SALES DATA UPLOAD — use this every time you have new SAP data</div>
-    <div class="section-divider-line"></div>
-  </div>
-
-  <div class="panel" style="margin-bottom:16px">
-    <div class="panel-header">
-      <div class="panel-title"><div class="dot" style="background:var(--amber)"></div>Upload Sales Excel → Auto-push to Firebase</div>
-    </div>
-    <div class="panel-body">
-      <div class="upload-zone" id="dropZone" onclick="document.getElementById('xlFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
-        <input type="file" id="xlFile" accept=".xlsx,.xls" onchange="handleXlFile(this.files[0])" style="display:none">
-        📁 Drop SAP sales Excel here · or click to browse<br>
-        <span style="color:var(--text-dim);font-size:10px">Needs: Customer Code, Customer Name, Product Description, Net Amount, Invoice Date, State</span>
-        <div style="color:var(--green);margin-top:6px;font-size:11px" id="xlFileName"></div>
-      </div>
-      <div class="prog-bar"><div class="prog-fill" id="xlProg"></div></div>
-      <div id="unmappedWarning" style="display:none;margin-top:10px;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.35);border-radius:8px;padding:12px;font-family:var(--mono);font-size:11px;color:var(--red);"></div>
-      <div class="btn-row">
-        <button class="btn btn-amber" id="xlUpBtn" onclick="processAndUpload()" disabled>⬆ PROCESS & ADD NEW DATA</button>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim);align-self:center">✓ Adds new rows only — duplicates auto-skipped, history preserved</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- MANUAL EDITS -->
-  <div class="section-divider">
-    <div class="section-divider-label">// MANUAL DATA EDITOR</div>
-    <div class="section-divider-line"></div>
-  </div>
-
-  <div class="grid-2">
-
-    <!-- ADD SO -->
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title"><div class="dot" style="background:var(--green)"></div>SO Performance</div>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="soCount">0 SOs</span>
-      </div>
-      <div class="panel-body">
-        <div class="row-2">
-          <div><label>SO NAME</label><input id="soName" placeholder="e.g. Prashant"></div>
-          <div><label>ZONE</label>
-            <select id="soZone">
-              <option value="Delhi/NCR">Delhi / NCR</option>
-              <option value="Rajasthan">Rajasthan</option>
-              <option value="West UP & UK">West UP & UK</option>
-              <option value="Punjab">Punjab</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-        </div>
-        <div><label>NET AMOUNT (₹)</label><input id="soAmt" type="number" placeholder="e.g. 134000"></div>
-        <div class="btn-row">
-          <button class="btn btn-green" onclick="addSO()">+ ADD SO</button>
-          <button class="btn btn-red" onclick="clearAll('so_data','SO')">🗑 Clear All SOs</button>
-        </div>
-        <div class="item-list" id="soList"></div>
-      </div>
-    </div>
-
-    <!-- ADD STOCKIST -->
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title"><div class="dot" style="background:var(--purple)"></div>Stockist Data</div>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="custCount">0 Stockists</span>
-      </div>
-      <div class="panel-body">
-        <div><label>STOCKIST NAME</label><input id="custName" placeholder="e.g. Tej Vashishth Pharmaceutical"></div>
-        <div class="row-3">
-          <div><label>SO NAME</label><input id="custSO" placeholder="e.g. Prashant"></div>
-          <div><label>ZONE</label>
-            <select id="custZone">
-              <option value="Delhi/NCR">Delhi / NCR</option>
-              <option value="Rajasthan">Rajasthan</option>
-              <option value="West UP & UK">West UP & UK</option>
-              <option value="Punjab">Punjab</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div><label>STATE</label><input id="custState" placeholder="Haryana"></div>
-        </div>
-        <div><label>NET AMOUNT (₹)</label><input id="custAmt" type="number" placeholder="e.g. 92000"></div>
-        <div class="btn-row">
-          <button class="btn btn-cyan" onclick="addStockist()">+ ADD STOCKIST</button>
-          <button class="btn btn-red" onclick="clearAll('cust_data','Stockist')">🗑 Clear All</button>
-        </div>
-        <div class="item-list" id="custList"></div>
-      </div>
-    </div>
-
-    <!-- ADD PRODUCT -->
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title"><div class="dot" style="background:var(--amber)"></div>Product Data</div>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="prodCount">0 Products</span>
-      </div>
-      <div class="panel-body">
-        <div><label>PRODUCT NAME</label><input id="prodName" placeholder="e.g. SENSOPIL GEL 125GM"></div>
-        <div><label>NET AMOUNT (₹)</label><input id="prodAmt" type="number" placeholder="e.g. 87600"></div>
-        <div class="btn-row">
-          <button class="btn btn-amber" onclick="addProduct()">+ ADD PRODUCT</button>
-          <button class="btn btn-red" onclick="clearAll('product_data','Product')">🗑 Clear All</button>
-        </div>
-        <div class="item-list" id="prodList"></div>
-      </div>
-    </div>
-
-    <!-- DAILY DATA -->
-    <div class="panel">
-      <div class="panel-header">
-        <div class="panel-title"><div class="dot" style="background:var(--cyan)"></div>Daily Billing</div>
-        <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)" id="dailyCount">0 Days</span>
-      </div>
-      <div class="panel-body">
-        <div class="row-2">
-          <div><label>DATE</label><input id="dayDate" type="date"></div>
-          <div><label>NET BILLING (₹)</label><input id="dayAmt" type="number" placeholder="e.g. 138000"></div>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-cyan" onclick="addDay()">+ ADD DAY</button>
-          <button class="btn btn-red" onclick="clearAll('daily_data','Daily')">🗑 Clear All</button>
-        </div>
-        <div class="item-list" id="dayList"></div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- SNAPSHOT HISTORY / RESTORE -->
-  <div class="panel" style="margin-top:16px">
-    <div class="panel-header">
-      <div class="panel-title"><div class="dot" style="background:var(--green)"></div>Snapshot History — Undo / Restore</div>
-      <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">Auto-saved before every upload, delete, or clear · last 15 kept</span>
-    </div>
-    <div class="panel-body">
-      <div class="item-list" id="historyList" style="max-height:220px"></div>
-    </div>
-  </div>
-
-  <!-- META -->
-  <div class="panel" style="margin-top:16px">
-    <div class="panel-header">
-      <div class="panel-title"><div class="dot" style="background:var(--text-mid)"></div>Dashboard Meta Info</div>
-    </div>
-    <div class="panel-body">
-      <div class="row-3">
-        <div><label>PERIOD TAG (header)</label><input id="metaTag" placeholder="Jun 2026"></div>
-        <div><label>PERIOD TEXT (sub)</label><input id="metaPeriod" placeholder="01 Jun → 27 Jun 2026"></div>
-        <div><label>SAP INFO CHIP</label><input id="metaSap" placeholder="SAP Lines: 735 · ₹10.78L"></div>
-      </div>
-      <div class="btn-row">
-        <button class="btn btn-green" onclick="saveMeta()">💾 SAVE META</button>
-        <button class="btn btn-red" onclick="resetDedup()">🔄 Reset Upload History (allow re-processing same file)</button>
-      </div>
-    </div>
-  </div>
-
-</main>
-</div>
-
-<script>
-firebase.initializeApp({
+const firebaseConfig = {
   apiKey: "AIzaSyBnsCYzc2J_NfBEpRzEq0-PDKrGuCnTGFw",
   authDomain: "otc-dashboard-4c418.firebaseapp.com",
   databaseURL: "https://otc-dashboard-4c418-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -371,912 +150,342 @@ firebase.initializeApp({
   storageBucket: "otc-dashboard-4c418.firebasestorage.app",
   messagingSenderId: "45401311739",
   appId: "1:45401311739:web:53e4b7a57a5b8800d6235e"
-});
-const db = firebase.database();
-const auth = firebase.auth();
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
 
-window.doLogin = function() {
+window.doLogin = async function(){
   const email = document.getElementById('loginEmail').value.trim();
-  const pass  = document.getElementById('loginPass').value;
-  const err   = document.getElementById('loginErr');
-  err.textContent = '';
-  auth.signInWithEmailAndPassword(email, pass).catch(e => {
-    err.textContent = e.message;
-  });
+  const pass = document.getElementById('loginPass').value;
+  const st = document.getElementById('loginStatus');
+  st.className = 'status show info'; st.textContent = 'Signing in...';
+  try{
+    await signInWithEmailAndPassword(auth, email, pass);
+  }catch(e){
+    st.className = 'status show err'; st.textContent = 'Login failed: ' + e.message;
+  }
 };
+window.doLogout = function(){ signOut(auth); };
 
-window.doLogout = function() {
-  if (!confirm('Log out of admin panel?')) return;
-  auth.signOut();
-};
-
-auth.onAuthStateChanged(function(user) {
-  if (user) {
-    document.getElementById('loginGate').classList.add('hide');
-    document.getElementById('adminContent').style.display = 'block';
-    document.getElementById('loggedInAs').textContent = '👤 ' + user.email;
-    loadAll();
+onAuthStateChanged(auth, (user) => {
+  if(user){
+    document.getElementById('loginGate').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'block';
+    document.getElementById('whoami').textContent = user.email;
+    loadMonthsList();
   } else {
-    document.getElementById('loginGate').classList.remove('hide');
-    document.getElementById('adminContent').style.display = 'none';
-    document.getElementById('loggedInAs').textContent = '';
+    document.getElementById('loginGate').style.display = 'block';
+    document.getElementById('mainApp').style.display = 'none';
   }
 });
 
-function toast(msg, err=false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast' + (err?' err':'') + ' show';
-  setTimeout(() => t.className='toast', 2500);
-}
+// ---------- helpers ----------
+const norm = s => (s===null||s===undefined) ? '' : String(s).trim().toUpperCase();
+const normCode = v => {
+  if(v===null||v===undefined||v==='') return '';
+  const n = Number(v);
+  return isFinite(n) ? String(Math.trunc(n)) : String(v).trim();
+};
+const monthKey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+const excelDateToJS = v => {
+  if(v instanceof Date) return v;
+  if(typeof v === 'number') return new Date(Math.round((v - 25569)*86400*1000));
+  const d = new Date(v); return isNaN(d) ? null : d;
+};
 
-// ── READ HELPER ───────────────────────────────────────────────────────────────
-// Reads each top-level node separately instead of db.ref('/') — required because
-// Firebase rules are scoped per-node (root has no .read rule of its own).
-async function readAllNodes() {
-  const keys = ['so_data','product_data','cust_data','daily_data','meta','history',
-                '_so_mapping','_product_mapping','_hierarchy_mapping','_processed_lines'];
-  const snaps = await Promise.all(keys.map(k => db.ref('/'+k).once('value')));
-  const d = {};
-  keys.forEach((k,i) => { d[k] = snaps[i].val(); });
-  return d;
-}
+let MASTER = { products:{}, parties:{}, team:{} }; // in-memory after load/parse
+let PARSED_MONTH = null; // { key, records, stats }
 
-// ── LOAD ALL DATA ────────────────────────────────────────────────────────────
-async function loadAll() {
-  try {
-    const d = await readAllNodes() || {};
-    document.getElementById('dbStatus').textContent = '● Connected';
-    document.getElementById('dbStatus').style.color = 'var(--green)';
-
-    const so   = d.so_data      ? Object.entries(d.so_data)      : [];
-    const prod = d.product_data ? Object.entries(d.product_data) : [];
-    const cust = d.cust_data    ? Object.entries(d.cust_data)    : [];
-    const day  = d.daily_data   ? Object.entries(d.daily_data)   : [];
-    const meta = d.meta || {};
-
-    // KPIs
-    const total = cust.reduce((s,[,v])=>s+v.amt,0);
-    document.getElementById('kTotal').textContent = `₹${(total/100000).toFixed(2)}L`;
-    document.getElementById('kSOs').textContent   = so.length;
-    document.getElementById('kCust').textContent  = cust.length;
-    document.getElementById('kProds').textContent = prod.length;
-
-    // Lists
-    renderSOList(so);
-    renderProdList(prod);
-    renderCustList(cust);
-    renderDayList(day);
-    renderHistoryList(d.history);
-    renderArchiveList();
-
-    // Meta
-    document.getElementById('metaTag').value    = meta.period_tag||'';
-    document.getElementById('metaPeriod').value = meta.period||'';
-    document.getElementById('metaSap').value    = meta.sap_info||'';
-
-    // SO + Product + Hierarchy Mapping status
-    const custMapping = d._so_mapping;
-    const prodMapping = d._product_mapping;
-    const hierMapping = d._hierarchy_mapping;
-    if (custMapping && Object.keys(custMapping).length) {
-      updateMappingStatus(Object.keys(custMapping).length, prodMapping ? Object.keys(prodMapping).length : 0, hierMapping ? Object.keys(hierMapping).length : 0);
-    } else {
-      document.getElementById('mappingStatus').textContent = '⚠ No mapping saved — sales upload will be blocked until you save one';
-      document.getElementById('mappingStatus').style.color = 'var(--amber)';
-    }
-  } catch(e) {
-    document.getElementById('dbStatus').textContent = '● Error: '+e.message;
-    document.getElementById('dbStatus').style.color = 'var(--red)';
+// ---------- Master data ----------
+function findHeaderRow(rows, requiredHeaders){
+  for(let i=0;i<Math.min(rows.length,5);i++){
+    const hdr = rows[i].map(norm);
+    if(requiredHeaders.every(h => hdr.includes(norm(h)))) return i;
   }
+  return -1;
+}
+function colIndex(hdrRow, names){
+  const H = hdrRow.map(norm);
+  for(const n of names){ const idx = H.indexOf(norm(n)); if(idx>=0) return idx; }
+  return -1;
 }
 
-const ZONE_CODE = {'Delhi/NCR':'DL','Rajasthan':'RJ','West UP & UK':'UP','Punjab':'PB'};
-function zoneClass(z) { return 'zone-'+(ZONE_CODE[z]||'OT'); }
+async function handleMasterUpload(){
+  const f = document.getElementById('masterFile').files[0];
+  const st = document.getElementById('masterStatus');
+  if(!f){ st.className='status show err'; st.textContent='Choose a file first.'; return; }
+  st.className='status show info'; st.textContent='Reading workbook...';
+  try{
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellDates:true});
 
-function renderSOList(entries) {
-  const sorted = [...entries].sort((a,b)=>b[1].amt-a[1].amt);
-  document.getElementById('soCount').textContent = sorted.length+' SOs';
-  document.getElementById('soList').innerHTML = sorted.map(([k,v])=>`
-    <div class="item-row">
-      <span class="item-name">${v.name}</span>
-      <span class="item-zone ${zoneClass(v.zone)}">${v.zone}</span>
-      <span class="item-amt">₹${(v.amt/1000).toFixed(1)}K</span>
-      <button class="del-btn" onclick="delEntry('so_data','${k}','${(v.name||'').replace(/'/g,"\\'")}')">✕</button>
-    </div>`).join('');
-}
-function renderProdList(entries) {
-  const sorted = [...entries].sort((a,b)=>b[1].amt-a[1].amt);
-  document.getElementById('prodCount').textContent = sorted.length+' Products';
-  document.getElementById('prodList').innerHTML = sorted.slice(0,20).map(([k,v])=>`
-    <div class="item-row">
-      <span class="item-name">${v.name}</span>
-      <span class="item-amt">₹${(v.amt/1000).toFixed(1)}K</span>
-      <button class="del-btn" onclick="delEntry('product_data','${k}','${(v.name||'').replace(/'/g,"\\'")}')">✕</button>
-    </div>`).join('');
-}
-function renderCustList(entries) {
-  const sorted = [...entries].sort((a,b)=>b[1].amt-a[1].amt);
-  document.getElementById('custCount').textContent = sorted.length+' Stockists';
-  document.getElementById('custList').innerHTML = sorted.map(([k,v])=>`
-    <div class="item-row">
-      <span class="item-name">${v.name}</span>
-      <span class="item-zone ${zoneClass(v.zone)}">${v.zone}</span>
-      <span class="item-amt">₹${(v.amt/1000).toFixed(1)}K</span>
-      <button class="del-btn" onclick="delEntry('cust_data','${k}','${(v.name||'').replace(/'/g,"\\'")}')">✕</button>
-    </div>`).join('');
-}
-function renderDayList(entries) {
-  const sorted = [...entries].sort((a,b)=>new Date(a[1].date)-new Date(b[1].date));
-  document.getElementById('dailyCount').textContent = sorted.length+' Days';
-  document.getElementById('dayList').innerHTML = sorted.map(([k,v])=>`
-    <div class="item-row">
-      <span class="item-name">${v.date}</span>
-      <span class="item-amt">₹${(v.amt/1000).toFixed(1)}K</span>
-      <button class="del-btn" onclick="delEntry('daily_data','${k}','${v.date}')">✕</button>
-    </div>`).join('');
-}
-
-// ── ADD ENTRIES ──────────────────────────────────────────────────────────────
-window.addSO = async function() {
-  const name=document.getElementById('soName').value.trim();
-  const zone=document.getElementById('soZone').value;
-  const amt=parseFloat(document.getElementById('soAmt').value);
-  if (!name||!amt) { toast('Fill SO name and amount',true); return; }
-  try {
-    await db.ref('/so_data').push({name,zone,amt});
-    toast('✓ SO added');
-    document.getElementById('soName').value='';
-    document.getElementById('soAmt').value='';
-    loadAll();
-  } catch(e){ toast(e.message,true); }
-};
-
-window.addProduct = async function() {
-  const name=document.getElementById('prodName').value.trim();
-  const amt=parseFloat(document.getElementById('prodAmt').value);
-  if (!name||!amt) { toast('Fill product name and amount',true); return; }
-  try {
-    await db.ref('/product_data').push({name,amt});
-    toast('✓ Product added');
-    document.getElementById('prodName').value='';
-    document.getElementById('prodAmt').value='';
-    loadAll();
-  } catch(e){ toast(e.message,true); }
-};
-
-window.addStockist = async function() {
-  const name=document.getElementById('custName').value.trim();
-  const so=document.getElementById('custSO').value.trim();
-  const zone=document.getElementById('custZone').value;
-  const state=document.getElementById('custState').value.trim();
-  const amt=parseFloat(document.getElementById('custAmt').value);
-  if (!name||!amt) { toast('Fill stockist name and amount',true); return; }
-  try {
-    await db.ref('/cust_data').push({name,so,zone,state,amt});
-    toast('✓ Stockist added');
-    document.getElementById('custName').value='';
-    document.getElementById('custAmt').value='';
-    loadAll();
-  } catch(e){ toast(e.message,true); }
-};
-
-window.addDay = async function() {
-  const rawDate=document.getElementById('dayDate').value;
-  const amt=parseFloat(document.getElementById('dayAmt').value);
-  if (!rawDate||!amt) { toast('Fill date and amount',true); return; }
-  const d=new Date(rawDate);
-  const dateStr=d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,'-');
-  try {
-    await db.ref('/daily_data').push({date:dateStr,amt});
-    toast('✓ Day added');
-    document.getElementById('dayDate').value='';
-    document.getElementById('dayAmt').value='';
-    loadAll();
-  } catch(e){ toast(e.message,true); }
-};
-
-// ── SNAPSHOTS (safety net — auto-saved before any destructive or overwrite action) ──
-async function saveSnapshot(reason) {
-  try {
-    const snap = await readAllNodes();
-    const d = snap || {};
-    const ts = Date.now();
-    const entry = {
-      ts,
-      label: new Date(ts).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),
-      reason: reason || 'Manual',
-      so_data: d.so_data || null,
-      product_data: d.product_data || null,
-      cust_data: d.cust_data || null,
-      daily_data: d.daily_data || null,
-      meta: d.meta || null,
-    };
-    await db.ref('/history/'+ts).set(entry);
-    // keep only the last 15 snapshots so the DB doesn't grow forever
-    const histSnap = await db.ref('/history').orderByKey().once('value');
-    const keys = [];
-    histSnap.forEach(c => keys.push(c.key));
-    if (keys.length > 15) {
-      const toDelete = keys.slice(0, keys.length - 15);
-      await Promise.all(toDelete.map(k => db.ref('/history/'+k).remove()));
+    // Product List
+    const prodSheet = wb.Sheets['Product List'];
+    if(!prodSheet) throw new Error('Sheet "Product List" not found');
+    const prodRows = XLSX.utils.sheet_to_json(prodSheet, {header:1, raw:true});
+    const prodHdrIdx = findHeaderRow(prodRows, ['Item Code','Product Name']);
+    const pHdr = prodRows[prodHdrIdx];
+    const pCodeC = colIndex(pHdr,['Item Code']), pNameC = colIndex(pHdr,['Product Name']),
+          pCatC = colIndex(pHdr,['Category']), pMrpC = colIndex(pHdr,['MRP (₹)','MRP']);
+    const products = {};
+    for(let i=prodHdrIdx+1;i<prodRows.length;i++){
+      const r = prodRows[i]; if(!r || r[pCodeC]===undefined || r[pCodeC]===null || r[pCodeC]==='') continue;
+      const code = normCode(r[pCodeC]);
+      products[code] = { name: r[pNameC]||'', category: r[pCatC]||'Uncategorized', mrp: r[pMrpC]||0 };
     }
-  } catch(e) { console.error('snapshot failed (non-fatal):', e); }
-}
 
-window.restoreSnapshot = async function(ts, label) {
-  if (!confirm(`Restore the snapshot from ${label}?\n\nThis will OVERWRITE your current SO/Stockist/Product/Daily/Meta data with that older version.\n\nYour CURRENT data will itself be saved as a snapshot first, so this restore can also be undone. Continue?`)) return;
-  try {
-    await saveSnapshot('Auto-save before restoring "'+label+'"');
-    const snap = await db.ref('/history/'+ts).once('value');
-    const h = snap.val();
-    if (!h) { toast('Snapshot not found', true); return; }
-    await Promise.all([
-      db.ref('/so_data').set(h.so_data||null),
-      db.ref('/product_data').set(h.product_data||null),
-      db.ref('/cust_data').set(h.cust_data||null),
-      db.ref('/daily_data').set(h.daily_data||null),
-      db.ref('/meta').set(h.meta||null),
-    ]);
-    toast('✓ Restored snapshot from '+h.label);
-    loadAll();
-  } catch(e){ toast(e.message, true); }
-};
-
-function renderHistoryList(history) {
-  const el = document.getElementById('historyList');
-  if (!el) return;
-  const entries = Object.entries(history||{}).sort((a,b)=>b[1].ts-a[1].ts);
-  if (!entries.length) {
-    el.innerHTML = '<div style="padding:10px 0;color:var(--text-dim);font-family:var(--mono);font-size:11px">No snapshots yet — one is saved automatically every time you upload, delete, or clear data. Check back after your next action.</div>';
-    return;
-  }
-  el.innerHTML = entries.map(([k,v])=>`
-    <div class="item-row">
-      <div class="item-name">${v.label} <span style="color:var(--text-dim)">— ${v.reason||''}</span></div>
-      <button class="btn btn-cyan" style="padding:4px 10px;font-size:10px" onclick="restoreSnapshot('${k}','${v.label}')">⟲ RESTORE</button>
-    </div>
-  `).join('');
-}
-
-window.delEntry = async function(path, key, displayName) {
-  if (!confirm(`Delete "${displayName||'this entry'}"?\n\nA snapshot of current data will be saved first, so this can be undone from the Snapshot History panel below.`)) return;
-  try {
-    await saveSnapshot('Before deleting one entry from '+path);
-    await db.ref(`/${path}/${key}`).remove();
-    toast('✓ Deleted (snapshot saved — restorable below)');
-    loadAll();
-  } catch(e){ toast(e.message,true); }
-};
-
-window.clearAll = async function(path, label) {
-  if (!confirm(`Delete ALL ${label} data from Firebase?\n\nA snapshot of current data will be saved first, so this can be undone from the Snapshot History panel below.`)) return;
-  try {
-    await saveSnapshot('Before clearing all '+label+' data');
-    await db.ref('/'+path).remove();
-    toast(`✓ All ${label} data cleared (snapshot saved — restorable below)`);
-    if (confirm(`Also reset Upload History now?\n\nIf you don't, your next sales upload will think these rows were "already processed" and skip everything — even though the data is now gone. You'll see "0 new rows" and the dashboard will stay empty.\n\nClick OK to reset history now (recommended), or Cancel if you're only clearing this one panel and plan to keep other data intact.`)) {
-      await db.ref('/_processed_lines').remove();
-      toast('✓ Upload History also reset — next upload will process fresh');
-    }
-    loadAll();
-  } catch(e){ toast(e.message,true); }
-};
-
-window.saveMeta = async function() {
-  const meta = {
-    period_tag: document.getElementById('metaTag').value.trim(),
-    period:     document.getElementById('metaPeriod').value.trim(),
-    sap_info:   document.getElementById('metaSap').value.trim(),
-  };
-  try {
-    await db.ref('/meta').set(meta);
-    toast('✓ Meta saved — dashboard updated');
-  } catch(e){ toast(e.message,true); }
-};
-
-window.resetDedup = async function() {
-  if (!confirm('This clears upload history tracking only — your existing SO/Stockist/Product/Daily numbers stay untouched. Use this only if you need to re-process a file (e.g. after fixing a wrong SO mapping). Continue?')) return;
-  try {
-    await db.ref('/_processed_lines').remove();
-    toast('✓ Upload history cleared — you can now re-process files without duplicate-skipping');
-  } catch(e){ toast(e.message,true); }
-};
-
-// ── EXCEL UPLOAD ─────────────────────────────────────────────────────────────
-window.handleDrop = function(e) {
-  e.preventDefault();
-  document.getElementById('dropZone').classList.remove('drag');
-  handleXlFile(e.dataTransfer.files[0]);
-};
-
-window.handleDropParty = function(e) {
-  e.preventDefault();
-  document.getElementById('dropZonePartyList').classList.remove('drag');
-  handlePartyFile(e.dataTransfer.files[0]);
-};
-
-window.handlePartyFile = async function(file) {
-  if (!file) return;
-  document.getElementById('partyFileName').textContent = '📄 ' + file.name;
-  toast('Reading Master Data Sheet...');
-  try {
-    if (!window.XLSX) {
-      await new Promise(r=>{ const s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';s.onload=r;document.head.appendChild(s); });
-    }
-    const buf = await file.arrayBuffer();
-    const wb  = XLSX.read(buf);
-
-    // ── Party List → customer/SO mapping ──────────────────────────────────
-    const partySheetName = wb.SheetNames.find(n => n.toLowerCase().includes('party')) || wb.SheetNames[0];
-    const partyRows = XLSX.utils.sheet_to_json(wb.Sheets[partySheetName]);
-    const STATE_ZONE={'HARYANA':'Delhi/NCR','DELHI':'Delhi/NCR','CHANDIGARH':'Delhi/NCR','RAJASTHAN':'Rajasthan','UTTAR PRADESH':'West UP & UK','UTTARAKHAND':'West UP & UK','PUNJAB':'Punjab'};
-    const custLookup = {};
-    partyRows.forEach(r => {
-      const code = String(parseInt(r['SAP Code'])||'').trim();
-      if (!code || code==='NaN') return;
-      const state = String(r['State']||'').trim().toUpperCase();
-      custLookup[code] = {
-        so: String(r['SO Name']||'').trim(),
-        zone: STATE_ZONE[state] || 'Other',
+    // Party List
+    const partySheet = wb.Sheets['Party List'];
+    if(!partySheet) throw new Error('Sheet "Party List" not found');
+    const partyRows = XLSX.utils.sheet_to_json(partySheet, {header:1, raw:true});
+    const partyHdrIdx = findHeaderRow(partyRows, ['SAP Code','SO Name']);
+    const ptHdr = partyRows[partyHdrIdx];
+    const ptCodeC = colIndex(ptHdr,['SAP Code']), ptNameC = colIndex(ptHdr,['Party Name']),
+          ptSoC = colIndex(ptHdr,['SO Name']), ptHqC = colIndex(ptHdr,['HQ']),
+          ptStateC = colIndex(ptHdr,['State']), ptTownC = colIndex(ptHdr,['Town']);
+    const parties = {};
+    for(let i=partyHdrIdx+1;i<partyRows.length;i++){
+      const r = partyRows[i]; if(!r || r[ptCodeC]===undefined || r[ptCodeC]===null || r[ptCodeC]==='') continue;
+      const code = normCode(r[ptCodeC]);
+      parties[code] = {
+        name: r[ptNameC]||'', so: (r[ptSoC]||'UNMAPPED').toString().trim(),
+        hq: (r[ptHqC]||'').toString().trim(), state: (r[ptStateC]||'').toString().trim(),
+        town: (r[ptTownC]||'').toString().trim()
       };
-    });
-
-    // ── Product List → valid product codes ──────────────────────────────────
-    // Note: this sheet's real headers are on the SECOND row (row index 1), not the first.
-    const prodSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('product'));
-    const prodLookup = {};
-    if (prodSheetName) {
-      const prodRows = XLSX.utils.sheet_to_json(wb.Sheets[prodSheetName], {range: 1});
-      prodRows.forEach(r => {
-        const code = String(parseInt(r['Item Code'])||'').trim();
-        if (!code || code==='NaN') return;
-        prodLookup[code] = String(r['Product Name']||'').trim();
-      });
     }
 
-    if (!prodSheetName || Object.keys(prodLookup).length === 0) {
-      toast('⚠ No "Product List" sheet found — product-code checking will be skipped', true);
+    // Team List
+    const teamSheet = wb.Sheets['Team List'];
+    if(!teamSheet) throw new Error('Sheet "Team List" not found');
+    const teamRows = XLSX.utils.sheet_to_json(teamSheet, {header:1, raw:true});
+    const teamHdrIdx = findHeaderRow(teamRows, ['Name','Designation']);
+    const tHdr = teamRows[teamHdrIdx];
+    const tNameC = colIndex(tHdr,['Name']), tHqC = colIndex(tHdr,['Head Qtr.','Head Qtr']),
+          tStateC = colIndex(tHdr,['State']), tDesigC = colIndex(tHdr,['Designation']),
+          tAsmC = colIndex(tHdr,['ASM']), tRsmC = colIndex(tHdr,['RSM']), tZsmC = colIndex(tHdr,['ZSM']);
+    const team = {};
+    const hqToState = {};
+    for(let i=teamHdrIdx+1;i<teamRows.length;i++){
+      const r = teamRows[i]; if(!r || !r[tNameC]) continue;
+      const nameKey = norm(r[tNameC]);
+      team[nameKey] = {
+        name: r[tNameC], hq: r[tHqC]||'', state: r[tStateC]||'', designation: r[tDesigC]||'',
+        asm: r[tAsmC]||'', rsm: r[tRsmC]||'', zsm: r[tZsmC]||''
+      };
+      if(r[tHqC] && r[tStateC]) hqToState[norm(r[tHqC])] = r[tStateC];
     }
+    // also seed hqToState from party list
+    Object.values(parties).forEach(p=>{ if(p.hq && p.state) hqToState[norm(p.hq)] = p.state; });
 
-    // ── Team List → ASM/RSM/ZSM/GM hierarchy ──────────────────────────────
-    // Real names live in Team List; Party List SO names are looser/inconsistently spelled,
-    // so we match Party List SO names → Team List authentic names using normalization + known aliases.
-    const teamSheetName = wb.SheetNames.find(n => n.toLowerCase().includes('team'));
-    const hierarchyLookup = {}; // keyed by Party List SO name (as used in so_data) -> {realName, asm, rsm, zsm, gm}
-    const unmatchedSOs = [];
+    MASTER = { products, parties, team, hqToState };
 
-    function normalize(name) {
-      if (!name) return '';
-      return String(name).trim().toUpperCase().replace(/[^\w\s]/g,'').replace(/\s+/g,' ');
-    }
+    await set(ref(db,'master'), { products, parties, team, hqToState, updatedAt: Date.now() });
 
-    const KNOWN_ALIASES = {
-      'MOHAMMAD ASIF':'MOHAMMED ASIF', 'SHAHBAZ KHAN':'SHAHBAJ KHAN',
-      'DHANRAJ':'DHAN RAJ', 'BHURARAM':'BHURA RAM', 'ASRSHDEEP SINGH':'ARSHDEEP SINGH SONI',
-    };
-
-    if (teamSheetName) {
-      const teamRows = XLSX.utils.sheet_to_json(wb.Sheets[teamSheetName]);
-      const soRows = teamRows.filter(r => String(r['Designation']||'').trim()==='SO');
-      const teamByNorm = {}, teamByFirstWord = {};
-      soRows.forEach(r => {
-        const norm = normalize(r['Name']);
-        const fw = norm.split(' ')[0];
-        teamByNorm[norm] = r;
-        if (!teamByFirstWord[fw]) teamByFirstWord[fw] = [];
-        teamByFirstWord[fw].push(r);
-      });
-
-      // Match each distinct Party List SO name to a Team List record
-      const distinctSONames = [...new Set(Object.values(custLookup).map(v=>v.so).filter(Boolean))];
-      distinctSONames.forEach(soName => {
-        const norm = normalize(soName);
-        if (norm === 'VACANT' || !norm) return;
-        let teamRecord = null;
-
-        if (KNOWN_ALIASES[norm] && teamByNorm[KNOWN_ALIASES[norm]]) {
-          teamRecord = teamByNorm[KNOWN_ALIASES[norm]];
-        } else if (teamByNorm[norm]) {
-          teamRecord = teamByNorm[norm];
-        } else {
-          const fw = norm.split(' ')[0];
-          if (teamByFirstWord[fw] && teamByFirstWord[fw].length === 1) {
-            teamRecord = teamByFirstWord[fw][0];
-          }
-        }
-
-        if (teamRecord) {
-          hierarchyLookup[soName] = {
-            realName: String(teamRecord['Name']||'').trim(),
-            asm: String(teamRecord['ASM']||'').trim(),
-            rsm: String(teamRecord['RSM']||'').trim(),
-            zsm: String(teamRecord['ZSM']||'').trim(),
-            gm:  String(teamRecord['GM']||'').trim(),
-          };
-        } else {
-          unmatchedSOs.push(soName);
-        }
-      });
-    }
-
-    if (unmatchedSOs.length > 0) {
-      toast(`⚠ Could not match hierarchy for: ${unmatchedSOs.join(', ')} — they'll show "Unassigned"`, true);
-    }
-
-    window._pendingMapping = { customers: custLookup, products: prodLookup, hierarchy: hierarchyLookup };
-    document.getElementById('saveMappingBtn').disabled = false;
-    toast(`✓ Read: ${Object.keys(custLookup).length} customers, ${Object.keys(prodLookup).length} products, ${Object.keys(hierarchyLookup).length} SO hierarchies — click "Save Mapping" to store it`);
-  } catch(e) {
-    toast('Master data error: ' + e.message, true);
+    document.getElementById('masterCount').textContent =
+      `${Object.keys(products).length} products · ${Object.keys(parties).length} parties · ${Object.keys(team).length} team members`;
+    st.className='status show ok';
+    st.textContent = `Master data pushed to Firebase successfully.`;
+  }catch(e){
+    st.className='status show err'; st.textContent = 'Error: ' + e.message;
+    console.error(e);
   }
-};
+}
+window.handleMasterUpload = handleMasterUpload;
 
-window.saveMappingToFirebase = async function() {
-  if (!window._pendingMapping) return;
-  const btn = document.getElementById('saveMappingBtn');
-  btn.disabled = true;
-  btn.textContent = 'SAVING...';
-  try {
-    await db.ref('/_so_mapping').set(window._pendingMapping.customers);
-    await db.ref('/_product_mapping').set(window._pendingMapping.products);
-    await db.ref('/_hierarchy_mapping').set(window._pendingMapping.hierarchy || {});
-    const custCount = Object.keys(window._pendingMapping.customers).length;
-    const prodCount = Object.keys(window._pendingMapping.products).length;
-    const hierCount = Object.keys(window._pendingMapping.hierarchy || {}).length;
-    toast(`✓ Saved: ${custCount} customers, ${prodCount} products, ${hierCount} hierarchies — used for all future sales uploads`);
-    btn.textContent = '✓ SAVED';
-    updateMappingStatus(custCount, prodCount, hierCount);
-  } catch(e) {
-    toast('Error saving mapping: ' + e.message, true);
-    btn.disabled = false;
-    btn.textContent = '💾 SAVE MAPPING TO FIREBASE';
-  }
-};
-
-// ── MONTH-END ARCHIVE ────────────────────────────────────────────────────────
-window.archiveCurrentMonth = async function() {
-  const btn = document.getElementById('archiveBtn');
-  const resultEl = document.getElementById('archiveResult');
-
-  // Derive month key from meta.period_tag or current date
-  const metaSnap = await db.ref('/meta').once('value');
-  const m = metaSnap.val() || {};
-  // Try to read month from period_tag (e.g. "Jun 2026"), fallback to current month
-  let monthKey;
-  if (m.period_tag) {
-    // period_tag e.g. "Jun 2026" → "2026-Jun"
-    const parts = m.period_tag.trim().split(/\s+/);
-    monthKey = parts.length >= 2 ? `${parts[1]}-${parts[0]}` : m.period_tag.replace(/[^a-zA-Z0-9]/g,'_');
-  } else {
-    const now = new Date();
-    monthKey = `${now.getFullYear()}-${now.toLocaleString('en-IN',{month:'short'})}`;
-  }
-
-  if (!confirm(`Archive current data as "${monthKey}" and clear the live dashboard for next month?\n\nThis saves SO/Stockist/Product/Daily/Meta to /archive/${monthKey} and wipes the live nodes.\n\nA snapshot is saved first so this is reversible if something goes wrong. Continue?`)) return;
-
-  btn.disabled = true;
-  btn.textContent = 'ARCHIVING...';
-  resultEl.style.display = 'none';
-
-  try {
-    await saveSnapshot('Before month-end archive to '+monthKey);
-
-    // Read all live nodes
-    const [soS, prodS, custS, dayS, metS] = await Promise.all([
-      db.ref('/so_data').once('value'),
-      db.ref('/product_data').once('value'),
-      db.ref('/cust_data').once('value'),
-      db.ref('/daily_data').once('value'),
-      db.ref('/meta').once('value'),
-    ]);
-
-    const archiveEntry = {
-      so_data:      soS.val()   || null,
-      product_data: prodS.val() || null,
-      cust_data:    custS.val() || null,
-      daily_data:   dayS.val()  || null,
-      meta:         metS.val()  || null,
-      archived_at:  new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),
-    };
-
-    // Write to archive
-    await db.ref('/archive/'+monthKey).set(archiveEntry);
-
-    // Clear live nodes
-    await Promise.all([
-      db.ref('/so_data').remove(),
-      db.ref('/product_data').remove(),
-      db.ref('/cust_data').remove(),
-      db.ref('/daily_data').remove(),
-      db.ref('/meta').remove(),
-    ]);
-
-    resultEl.style.display = 'block';
-    resultEl.style.background = 'rgba(74,222,128,0.1)';
-    resultEl.style.border = '1px solid rgba(74,222,128,0.35)';
-    resultEl.style.color = 'var(--green)';
-    resultEl.innerHTML = `✓ "${monthKey}" archived successfully.<br>Live dashboard is now empty — upload July's SAP data to start fresh.<br><span style="color:var(--text-dim)">Old data visible on dashboard via the month-switcher dropdown.</span>`;
-    toast(`✓ ${monthKey} archived — live nodes cleared`);
-    loadAll();
-  } catch(e) {
-    resultEl.style.display = 'block';
-    resultEl.style.background = 'rgba(248,113,113,0.1)';
-    resultEl.style.border = '1px solid rgba(248,113,113,0.35)';
-    resultEl.style.color = 'var(--red)';
-    resultEl.innerHTML = `✕ Archive failed: ${e.message}<br><span style="color:var(--text-dim)">No data was changed — restore from Snapshot History if needed.</span>`;
-    toast(e.message, true);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '📦 ARCHIVE CURRENT MONTH & START FRESH';
-  }
-};
-
-async function renderArchiveList() {
-  const el = document.getElementById('archiveList');
-  if (!el) return;
-  try {
-    const snap = await db.ref('/archive').once('value');
-    const d = snap.val();
-    if (!d) { el.textContent = 'No archived months yet.'; return; }
-    const entries = Object.entries(d).sort((a,b) => b[0].localeCompare(a[0]));
-    el.innerHTML = entries.map(([k,v]) => {
-      const soCount = v.so_data ? Object.keys(v.so_data).length : 0;
-      const tot = v.so_data ? Object.values(v.so_data).reduce((s,r)=>s+(r.amt||0),0) : 0;
-      return `<div style="padding:5px 0;border-bottom:1px solid var(--border2);display:flex;justify-content:space-between;align-items:center">
-        <span style="color:var(--amber)">${k}</span>
-        <span style="color:var(--text-dim)">${soCount} SOs · ₹${(tot/100000).toFixed(2)}L</span>
-        <span style="color:var(--text-dim);font-size:10px">Archived ${v.archived_at||''}</span>
-      </div>`;
-    }).join('');
-  } catch(e) { el.textContent = 'Could not load archive list.'; }
+async function ensureMasterLoaded(){
+  if(Object.keys(MASTER.products).length) return true;
+  const snap = await get(ref(db,'master'));
+  if(snap.exists()){ MASTER = snap.val(); MASTER.hqToState = MASTER.hqToState || {}; return true; }
+  return false;
 }
 
-window.backfillHierarchy = async function() {
-  const btn = document.getElementById('backfillBtn');
-  const resultEl = document.getElementById('backfillResult');
-  btn.disabled = true;
-  btn.textContent = 'CHECKING...';
-  resultEl.style.display = 'none';
-  try {
-    const [hierSnap, soSnap] = await Promise.all([
-      db.ref('/_hierarchy_mapping').once('value'),
-      db.ref('/so_data').once('value'),
-    ]);
-    const hierLookup = hierSnap.val() || {};
-    const soNow = soSnap.val() || {};
+// ---------- Sales parsing ----------
+const FORMAT_A_HEADERS = ['Billing Type','Head Quarter','State','Customer Code','Product Code','Net Amount'];
+const FORMAT_B_HEADERS = ['Division Name','City','Customer Code','Product Code','Net Amount'];
 
-    if (!Object.keys(hierLookup).length) {
-      resultEl.style.display = 'block';
-      resultEl.style.background = 'rgba(251,191,36,0.1)';
-      resultEl.style.border = '1px solid rgba(251,191,36,0.35)';
-      resultEl.style.color = 'var(--amber)';
-      resultEl.innerHTML = '⚠ No hierarchy mapping saved yet. Upload your Master Data Sheet (must include a "Team List" sheet with ASM/RSM/ZSM/GM columns) and click "Save Mapping to Firebase" first, then run this again.';
-      btn.disabled = false;
-      btn.textContent = '🔄 RE-APPLY HIERARCHY TO EXISTING SO DATA';
-      return;
+async function handleSalesParse(){
+  const f = document.getElementById('salesFile').files[0];
+  const st = document.getElementById('parseStatus');
+  document.getElementById('previewBox').style.display='none';
+  if(!f){ st.className='status show err'; st.textContent='Choose a file first.'; return; }
+  st.className='status show info'; st.textContent='Loading master data & parsing...';
+
+  const ok = await ensureMasterLoaded();
+  if(!ok){ st.className='status show err'; st.textContent='Master data not found in Firebase — upload it first (Step 1).'; return; }
+
+  try{
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellDates:true});
+    // Use the sheet with the most rows (raw data sheet, ignoring pivot summary sheets)
+    let bestSheet = null, bestRows = 0;
+    for(const sn of wb.SheetNames){
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, raw:true});
+      if(rows.length > bestRows){ bestRows = rows.length; bestSheet = sn; }
+    }
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[bestSheet], {header:1, raw:true});
+    const hdr = rows[0].map(h => (h||'').toString().trim());
+    const H = hdr.map(norm);
+
+    const isFormatB = H.includes(norm('Division Name')) && H.includes(norm('City'));
+    const format = isFormatB ? 'B (City/Division)' : 'A (Head Quarter/State)';
+
+    const cDate = colIndex(hdr, ['Invoice Date','Invoce Date']);
+    const cProdCode = colIndex(hdr, ['Product Code']);
+    const cProdDesc = colIndex(hdr, ['Product Description']);
+    const cCustCode = colIndex(hdr, ['Customer Code']);
+    const cCustName = colIndex(hdr, ['Customer Name']);
+    const cNet = colIndex(hdr, ['Net Amount']);
+    const cQty = colIndex(hdr, ['Quantity']);
+    const cHq = colIndex(hdr, ['Head Quarter','City']);
+    const cState = colIndex(hdr, ['State']);
+    const cDivName = colIndex(hdr, ['Division Name']);
+
+    if(cDate<0 || cProdCode<0 || cCustCode<0 || cNet<0){
+      throw new Error('Could not find required columns (Invoice Date / Product Code / Customer Code / Net Amount). Check the file headers.');
     }
 
-    if (!Object.keys(soNow).length) {
-      resultEl.style.display = 'block';
-      resultEl.style.background = 'rgba(251,191,36,0.1)';
-      resultEl.style.border = '1px solid rgba(251,191,36,0.35)';
-      resultEl.style.color = 'var(--amber)';
-      resultEl.innerHTML = '⚠ No SO data exists yet — nothing to backfill. Upload a sales Excel first.';
-      btn.disabled = false;
-      btn.textContent = '🔄 RE-APPLY HIERARCHY TO EXISTING SO DATA';
-      return;
-    }
+    let total=0, otcCount=0, mappedCount=0, unmappedCount=0, netSum=0;
+    const records = [];
+    const unmappedSample = [];
+    let detectedMonth = null;
 
-    await saveSnapshot('Before hierarchy backfill');
+    for(let i=1;i<rows.length;i++){
+      const r = rows[i];
+      if(!r || r[cDate]===undefined || r[cDate]===null || r[cDate]==='') continue;
+      total++;
+      const code = normCode(r[cProdCode]);
+      const prod = MASTER.products[code];
+      if(!prod) continue; // not an OTC product code -> excluded
+      if(cDivName>=0 && r[cDivName] && norm(r[cDivName]) !== 'OTC') continue; // safety net
 
-    let matched = 0;
-    const unmatched = [];
-    const updated = {};
-    Object.entries(soNow).forEach(([k, v]) => {
-      const h = hierLookup[v.name];
-      if (h) {
-        updated[k] = { ...v, asm: h.asm||'', rsm: h.rsm||'', zsm: h.zsm||'', gm: h.gm||'' };
-        matched++;
-      } else {
-        updated[k] = v;
-        unmatched.push(v.name);
+      const dt = excelDateToJS(r[cDate]);
+      if(!dt) continue;
+      if(!detectedMonth) detectedMonth = monthKey(dt);
+
+      const custCode = normCode(r[cCustCode]);
+      const party = MASTER.parties[custCode];
+      const soName = party ? party.so : 'UNMAPPED';
+      let hq = (cHq>=0 ? (r[cHq]||'') : '').toString().trim();
+      let state = (cState>=0 ? (r[cState]||'') : '').toString().trim();
+      if(!hq && party) hq = party.hq;
+      if(!state){
+        state = party ? party.state : (MASTER.hqToState[norm(hq)] || '');
       }
-    });
+      const team = MASTER.team[norm(soName)] || {};
 
-    await db.ref('/so_data').set(updated);
+      otcCount++;
+      const net = Number(r[cNet])||0;
+      netSum += net;
+      if(party) mappedCount++; else { unmappedCount++; if(unmappedSample.length<200) unmappedSample.push({custCode, custName:r[cCustName], hq, state, net}); }
 
-    resultEl.style.display = 'block';
-    if (unmatched.length === 0) {
-      resultEl.style.background = 'rgba(74,222,128,0.1)';
-      resultEl.style.border = '1px solid rgba(74,222,128,0.35)';
-      resultEl.style.color = 'var(--green)';
-      resultEl.innerHTML = `✓ Hierarchy applied to all ${matched} SOs. Dashboard RSM/ZSM/ASM views are now populated — refresh dashboard.html to see it.`;
-    } else {
-      resultEl.style.background = 'rgba(248,113,113,0.1)';
-      resultEl.style.border = '1px solid rgba(248,113,113,0.35)';
-      resultEl.style.color = 'var(--red)';
-      resultEl.innerHTML = `✓ Matched ${matched} of ${matched+unmatched.length} SOs.<br>⚠ Could not match (will show "Unassigned"): ${unmatched.join(', ')}<br><span style="color:var(--text-dim)">These names exist in so_data but not in your Team List sheet — check spelling, or that they're marked Designation "SO" in Team List, then re-upload Master Data Sheet and run this again.</span>`;
+      records.push({
+        d: dt.toISOString().slice(0,10),
+        pc: code,
+        pn: prod.name || (r[cProdDesc]||''),
+        cat: prod.category || 'Uncategorized',
+        cc: custCode,
+        cn: (r[cCustName]||'').toString().trim(),
+        hq: hq || 'UNKNOWN',
+        st: state || 'UNKNOWN',
+        so: soName,
+        asm: team.asm || 'UNMAPPED',
+        rsm: team.rsm || 'UNMAPPED',
+        zsm: team.zsm || 'UNMAPPED',
+        q: Number(r[cQty])||0,
+        na: net,
+        mapped: !!party
+      });
     }
-    toast(`✓ Backfill done — ${matched} matched, ${unmatched.length} unmatched (snapshot saved — restorable below)`);
-    loadAll();
-  } catch(e) {
-    toast(e.message, true);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '🔄 RE-APPLY HIERARCHY TO EXISTING SO DATA';
-  }
-};
 
-function updateMappingStatus(custCount, prodCount, hierCount) {
-  document.getElementById('mappingStatus').textContent = `✓ ${custCount} customers, ${prodCount} products, ${hierCount||0} hierarchies saved`;
-  document.getElementById('mappingStatus').style.color = 'var(--green)';
+    PARSED_MONTH = {
+      key: detectedMonth, records,
+      stats: { total, otcCount, mappedCount, unmappedCount, netSum, format },
+      unmappedSample
+    };
+
+    document.getElementById('pvMonth').textContent = detectedMonth || 'unknown';
+    document.getElementById('pvFormat').textContent = format;
+    document.getElementById('pvTotal').textContent = total.toLocaleString('en-IN');
+    document.getElementById('pvOtc').textContent = otcCount.toLocaleString('en-IN');
+    document.getElementById('pvNet').textContent = '₹' + netSum.toLocaleString('en-IN',{maximumFractionDigits:0});
+    document.getElementById('pvMapped').textContent = mappedCount.toLocaleString('en-IN') + ` (${(100*mappedCount/otcCount).toFixed(1)}%)`;
+    document.getElementById('pvUnmapped').textContent = unmappedCount.toLocaleString('en-IN') + ` (${(100*unmappedCount/otcCount).toFixed(1)}%)`;
+    document.getElementById('previewBox').style.display = 'block';
+    st.className='status show ok'; st.textContent = 'Parsed successfully. Review the summary below, then push.';
+  }catch(e){
+    st.className='status show err'; st.textContent = 'Error: ' + e.message;
+    console.error(e);
+  }
 }
+window.handleSalesParse = handleSalesParse;
 
-window.handleXlFile = function(file) {
-  if (!file) return;
-  document.getElementById('xlFileName').textContent = '📄 ' + file.name;
-  document.getElementById('xlUpBtn').disabled = false;
-  window._xlFile = file;
-};
-
-// STEP 1: Analyze the file, show a preview, wait for explicit confirmation before writing anything.
-window.processAndUpload = async function() {
-  const file = window._xlFile;
-  if (!file) return;
-
-  let custLookup, prodLookup;
-  try {
-    const custSnap = await db.ref('/_so_mapping').once('value');
-    const prodSnap = await db.ref('/_product_mapping').once('value');
-    custLookup = custSnap.val();
-    prodLookup = prodSnap.val();
-  } catch(e) {
-    toast('Could not load saved mapping: ' + e.message, true);
-    return;
-  }
-  if (!custLookup) {
-    toast('No mapping saved yet — upload Master Data Sheet above first (one-time setup)', true);
-    return;
-  }
-  const hasProdCheck = prodLookup && Object.keys(prodLookup).length > 0;
-
-  const btn = document.getElementById('xlUpBtn');
-  btn.disabled = true;
-  btn.textContent = 'ANALYZING...';
-  const setProg = p => document.getElementById('xlProg').style.width = p+'%';
-  setProg(5);
-
-  try {
-    if (!window.XLSX) {
-      await new Promise(r=>{ const s=document.createElement('script');s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';s.onload=r;document.head.appendChild(s); });
-    }
-    const buf  = await file.arrayBuffer();
-    const wb   = XLSX.read(buf);
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-    setProg(20);
-
-    const existing = await readAllNodes() || {};
-    const processedLines = existing._processed_lines || {};
-
-    const soMap={}, prodMap={}, custMap={}, dayMap={};
-    Object.values(existing.so_data||{}).forEach(v=>{ soMap[v.name+'|'+v.zone]={name:v.name,zone:v.zone,amt:v.amt}; });
-    Object.values(existing.product_data||{}).forEach(v=>{ prodMap[v.name]=v.amt; });
-    Object.values(existing.cust_data||{}).forEach(v=>{ custMap[v.name]={name:v.name,so:v.so,zone:v.zone,state:v.state,amt:v.amt}; });
-    Object.values(existing.daily_data||{}).forEach(v=>{
-      const d = new Date(v.date.replace(/-/g,' '));
-      if (!isNaN(d)) dayMap[d.toISOString().slice(0,10)] = v.amt;
+async function pushMonthToFirebase(){
+  if(!PARSED_MONTH || !PARSED_MONTH.key){ return; }
+  const st = document.getElementById('pushStatus');
+  st.className='status show info'; st.textContent='Uploading to Firebase (this may take a moment for large months)...';
+  document.getElementById('pushBtn').disabled = true;
+  try{
+    const monthRef = ref(db, `months/${PARSED_MONTH.key}`);
+    // wipe existing records for this month first (handles re-uploads/corrections)
+    await remove(child(monthRef,'records'));
+    const recObj = {};
+    PARSED_MONTH.records.forEach((rec,idx)=>{ recObj['r'+idx] = rec; });
+    await set(child(monthRef,'records'), recObj);
+    await set(child(monthRef,'meta'), {
+      rowCount: PARSED_MONTH.records.length,
+      netTotal: PARSED_MONTH.stats.netSum,
+      mappedCount: PARSED_MONTH.stats.mappedCount,
+      unmappedCount: PARSED_MONTH.stats.unmappedCount,
+      importedAt: Date.now()
     });
-
-    setProg(35);
-
-    const STATE_ZONE={'HARYANA':'Delhi/NCR','DELHI':'Delhi/NCR','CHANDIGARH':'Delhi/NCR','RAJASTHAN':'Rajasthan','UTTAR PRADESH':'West UP & UK','UTTARAKHAND':'West UP & UK','PUNJAB':'Punjab'};
-    let newLineCount=0, skippedCount=0, newTotal=0, minDate=null, maxDate=null;
-    const newFingerprints = {};
-    const rejectedCustomers = {}, rejectedProducts = {};
-    let rejectedCustAmt = 0, rejectedProdAmt = 0;
-    const distinctCustomersInFile = new Set(), distinctProductsInFile = new Set();
-
-    rows.forEach(r=>{
-      const amt=parseFloat(r['Net Amount']||0); if(!amt) return;
-
-      const custCode = String(r['Customer Code']||'').trim();
-      const prodCode = String(r['Product Code']||'').trim();
-      const cust=String(r['Customer Name']||'').trim();
-      const prod=String(r['Product Description']||'').trim();
-      distinctCustomersInFile.add(cust);
-      distinctProductsInFile.add(prod);
-
-      // REJECT rows whose customer isn't in the saved mapping.
-      const partyInfo = custLookup ? custLookup[custCode] : null;
-      if (!partyInfo) {
-        rejectedCustAmt += amt;
-        rejectedCustomers[cust] = (rejectedCustomers[cust]||0) + amt;
-        return;
-      }
-
-      // REJECT rows whose product isn't in the saved Product List (only if we have one to check against).
-      if (hasProdCheck && !prodLookup[prodCode]) {
-        rejectedProdAmt += amt;
-        rejectedProducts[prod] = (rejectedProducts[prod]||0) + amt;
-        return;
-      }
-
-      const rawDate = r['Invoice Date'];
-      let dISO = '';
-      let d = typeof rawDate==='number' ? new Date(Math.round((rawDate-25569)*86400*1000)) : new Date(rawDate);
-      if (!isNaN(d)) dISO = d.toISOString().slice(0,10);
-      const fingerprint = `${dISO}_${custCode}_${prodCode}_${amt}`.replace(/[.\$#\[\]\/\s]/g, '_');
-
-      if (processedLines[fingerprint] || newFingerprints[fingerprint]) {
-        skippedCount++;
-        return;
-      }
-      newFingerprints[fingerprint] = true;
-
-      newLineCount++; newTotal+=amt;
-      const state=String(r['State']||'').trim().toUpperCase();
-      const soName = partyInfo.so;
-      const zone2 = partyInfo.zone;
-
-      if(prod){ prodMap[prod]=(prodMap[prod]||0)+amt; }
-      if(cust){
-        if(!custMap[cust]) custMap[cust]={name:cust,so:soName,zone:zone2,state:state.toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()),amt:0};
-        custMap[cust].amt+=amt;
-      }
-      if(soName){
-        const soKey = soName+'|'+zone2;
-        if(!soMap[soKey]) soMap[soKey]={name:soName,zone:zone2,amt:0};
-        soMap[soKey].amt+=amt;
-      }
-      if(dISO){
-        dayMap[dISO]=(dayMap[dISO]||0)+amt;
-        if(!minDate||d<minDate)minDate=d;
-        if(!maxDate||d>maxDate)maxDate=d;
-      }
-    });
-
-    setProg(55);
-
-    // Stash everything needed to commit later, without writing yet.
-    window._pendingUpload = {
-      soMap, prodMap, custMap, dayMap, processedLines, newFingerprints,
-      newLineCount, skippedCount, newTotal, minDate, maxDate, existing,
-      rejectedCustomers, rejectedProducts, rejectedCustAmt, rejectedProdAmt
-    };
-
-    // ── Build preview ──────────────────────────────────────────────────────
-    const totalRejectedAmt = rejectedCustAmt + rejectedProdAmt;
-    const rejCustNames = Object.keys(rejectedCustomers);
-    const rejProdNames = Object.keys(rejectedProducts);
-
-    let html = `
-      <div><b style="color:var(--text)">File:</b> ${file.name}</div>
-      <div><b style="color:var(--text)">Total rows in file:</b> ${rows.length}</div>
-      <div><b style="color:var(--green)">Will be added:</b> ${newLineCount} rows (₹${(newTotal/100000).toFixed(2)}L)</div>
-      <div><b style="color:var(--text-dim)">Already uploaded before (skipped):</b> ${skippedCount} rows</div>
-    `;
-    if (rejCustNames.length || rejProdNames.length) {
-      html += `<div style="margin-top:10px;color:var(--red)"><b>⚠ Will be REJECTED — not in your master sheet (₹${(totalRejectedAmt/100000).toFixed(2)}L total):</b></div>`;
-      if (rejCustNames.length) html += `<div style="margin-top:4px;color:var(--red)">Unknown customers (${rejCustNames.length}): ${rejCustNames.slice(0,15).join(', ')}${rejCustNames.length>15?` +${rejCustNames.length-15} more`:''}</div>`;
-      if (rejProdNames.length) html += `<div style="margin-top:4px;color:var(--red)">Unknown products (${rejProdNames.length}): ${rejProdNames.slice(0,15).join(', ')}${rejProdNames.length>15?` +${rejProdNames.length-15} more`:''}</div>`;
-      html += `<div style="margin-top:8px;color:var(--amber)">If this looks like the WRONG FILE (different division, wrong date range, etc.) — click Cancel and check before proceeding.</div>`;
-    } else {
-      html += `<div style="margin-top:10px;color:var(--green)">✓ Every row matched your master sheet — looks like a clean upload.</div>`;
-    }
-
-    document.getElementById('previewContent').innerHTML = html;
-    document.getElementById('previewModal').style.display = 'flex';
-    setProg(0);
-    btn.disabled = false;
-    btn.textContent = '⬆ PROCESS & ADD NEW DATA';
-  } catch(e){
-    toast(e.message,true);
-    btn.disabled=false;
-    btn.textContent='⬆ PROCESS & ADD NEW DATA';
-    document.getElementById('xlProg').style.width='0%';
+    st.className='status show ok'; st.textContent = `Pushed ${PARSED_MONTH.records.length} rows for ${PARSED_MONTH.key}.`;
+    loadMonthsList();
+  }catch(e){
+    st.className='status show err'; st.textContent = 'Upload failed: ' + e.message;
+    console.error(e);
+  }finally{
+    document.getElementById('pushBtn').disabled = false;
   }
-};
+}
+window.pushMonthToFirebase = pushMonthToFirebase;
 
-window.cancelUpload = function() {
-  document.getElementById('previewModal').style.display = 'none';
-  window._pendingUpload = null;
-  toast('Upload cancelled — nothing was changed', true);
-};
+function downloadUnmapped(){
+  if(!PARSED_MONTH || !PARSED_MONTH.unmappedSample.length){ alert('No unmapped rows in this file.'); return; }
+  const ws = XLSX.utils.json_to_sheet(PARSED_MONTH.unmappedSample);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Unmapped');
+  XLSX.writeFile(wb, `unmapped_${PARSED_MONTH.key}.xlsx`);
+}
+window.downloadUnmapped = downloadUnmapped;
 
-// STEP 2: Only called after explicit user confirmation in the preview modal.
-window.confirmUpload = async function() {
-  const p = window._pendingUpload;
-  if (!p) return;
-  document.getElementById('previewModal').style.display = 'none';
+async function loadMonthsList(){
+  const body = document.getElementById('monthsBody');
+  body.innerHTML = '<tr><td colspan="5" class="small">Loading...</td></tr>';
+  const snap = await get(ref(db,'months'));
+  if(!snap.exists()){ body.innerHTML = '<tr><td colspan="5" class="small">No months imported yet.</td></tr>'; return; }
+  const val = snap.val();
+  const keys = Object.keys(val).sort();
+  body.innerHTML = '';
+  keys.forEach(k=>{
+    const meta = val[k].meta || {};
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${k}</td>
+      <td class="num">${(meta.rowCount||0).toLocaleString('en-IN')}</td>
+      <td class="num">₹${(meta.netTotal||0).toLocaleString('en-IN',{maximumFractionDigits:0})}</td>
+      <td class="small">${meta.importedAt ? new Date(meta.importedAt).toLocaleString('en-IN') : '—'}</td>
+      <td><button class="danger" style="padding:5px 12px;font-size:11px" onclick="deleteMonth('${k}')">Delete</button></td>`;
+    body.appendChild(tr);
+  });
+}
+window.loadMonthsList = loadMonthsList;
 
-  const btn = document.getElementById('xlUpBtn');
-  btn.disabled = true;
-  btn.textContent = 'UPLOADING...';
-  const setProg = pct => document.getElementById('xlProg').style.width = pct+'%';
-  setProg(60);
-
-  try {
-    if (p.newLineCount === 0) {
-      toast(`⚠ Nothing new to add — ${p.skippedCount} rows were duplicates, rest were rejected`, true);
-      btn.disabled = false;
-      btn.textContent = '⬆ PROCESS & ADD NEW DATA';
-      setProg(0);
-      return;
-    }
-
-    const hierSnap = await db.ref('/_hierarchy_mapping').once('value');
-    const hierLookup = hierSnap.val() || {};
-
-    const so_data={}, product_data={}, cust_data={}, daily_data={};
-    Object.entries(p.soMap).forEach(([,v],i)=>{
-      v.amt=Math.round(v.amt*100)/100;
-      const h = hierLookup[v.name];
-      if (h) { v.asm=h.asm||''; v.rsm=h.rsm||''; v.zsm=h.zsm||''; v.gm=h.gm||''; }
-      so_data[`so_${i}`]=v;
-    });
-    Object.entries(p.prodMap).forEach(([name,amt],i)=>{product_data[`prod_${i}`]={name,amt:Math.round(amt*100)/100};});
-    Object.entries(p.custMap).forEach(([,v],i)=>{v.amt=Math.round(v.amt*100)/100;cust_data[`cust_${i}`]=v;});
-    Object.entries(p.dayMap).sort().forEach(([key,amt],i)=>{
-      const d=new Date(key);
-      daily_data[`day_${i}`]={date:d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}).replace(/ /g,'-'),amt:Math.round(amt*100)/100};
-    });
-
-    const updatedProcessedLines = Object.assign({}, p.processedLines);
-    Object.keys(p.newFingerprints).forEach(fp => { updatedProcessedLines[fp] = true; });
-
-    const grandTotal = Object.values(cust_data).reduce((s,v)=>s+v.amt,0);
-    const allDates = Object.keys(p.dayMap).sort();
-    const meta={
-      period: allDates.length ? `${new Date(allDates[0]).toLocaleDateString('en-IN',{day:'2-digit',month:'short'})} → ${new Date(allDates[allDates.length-1]).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}` : (p.existing.meta?.period||''),
-      period_tag: allDates.length ? new Date(allDates[allDates.length-1]).toLocaleDateString('en-IN',{month:'short',year:'numeric'}) : (p.existing.meta?.period_tag||''),
-      billing_days: allDates.length,
-      sap_info:`SAP Lines: ${Object.keys(updatedProcessedLines).length} · ₹${(grandTotal/100000).toFixed(2)}L`,
-    };
-
-    setProg(70);
-    await saveSnapshot('Before sales upload — '+p.newLineCount+' new rows');
-    setProg(80);
-    await Promise.all([
-      db.ref('/so_data').set(so_data),
-      db.ref('/product_data').set(product_data),
-      db.ref('/cust_data').set(cust_data),
-      db.ref('/daily_data').set(daily_data),
-      db.ref('/meta').set(meta),
-      db.ref('/_processed_lines').set(updatedProcessedLines),
-    ]);
-    setProg(100);
-
-    const warnEl = document.getElementById('unmappedWarning');
-    const rejCustNames = Object.keys(p.rejectedCustomers);
-    const rejProdNames = Object.keys(p.rejectedProducts);
-    if (rejCustNames.length || rejProdNames.length) {
-      let msg = '';
-      if (rejCustNames.length) msg += `Unknown customers (₹${(p.rejectedCustAmt/100000).toFixed(2)}L): ${rejCustNames.map(n=>`${n} (₹${(p.rejectedCustomers[n]/1000).toFixed(1)}K)`).join(', ')}<br>`;
-      if (rejProdNames.length) msg += `Unknown products (₹${(p.rejectedProdAmt/100000).toFixed(2)}L): ${rejProdNames.map(n=>`${n} (₹${(p.rejectedProducts[n]/1000).toFixed(1)}K)`).join(', ')}<br>`;
-      warnEl.style.display = 'block';
-      warnEl.innerHTML = `⚠ Rows excluded from this upload — not in your master sheet:<br>${msg}<br>To include them: add to your Master Data Sheet, re-save mapping, then re-upload this same file.`;
-      toast(`✓ Added ${p.newLineCount} rows · ⚠ Rejected ${rejCustNames.length+rejProdNames.length} unmapped entries`, true);
-    } else {
-      warnEl.style.display = 'none';
-      toast(`✓ Added ${p.newLineCount} new rows (₹${(p.newTotal/100000).toFixed(2)}L) · Skipped ${p.skippedCount} duplicates · Clean upload`);
-    }
-
-    btn.textContent = '✓ DATA ADDED!';
-    btn.style.background='linear-gradient(135deg,rgba(74,222,128,0.2),rgba(74,222,128,0.1))';
-    btn.style.borderColor='var(--green)';
-    btn.style.color='var(--green)';
-    window._pendingUpload = null;
-    loadAll();
-  } catch(e){
-    toast(e.message,true);
-    btn.disabled=false;
-    btn.textContent='⬆ PROCESS & ADD NEW DATA';
-    document.getElementById('xlProg').style.width='0%';
-  }
-};
-
-loadAll();
+async function deleteMonth(k){
+  if(!confirm(`Delete all data for ${k}? This cannot be undone.`)) return;
+  await remove(ref(db, `months/${k}`));
+  loadMonthsList();
+}
+window.deleteMonth = deleteMonth;
 </script>
 </body>
 </html>
