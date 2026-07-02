@@ -22,10 +22,6 @@
       var(--bg);
     color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;
   }
-  .scanline{position:fixed;top:0;left:0;right:0;height:2px;
-    background:linear-gradient(90deg,transparent,var(--cyan),transparent);
-    opacity:.5;animation:sweep 6s linear infinite;pointer-events:none;z-index:50}
-  @keyframes sweep{0%{transform:translateY(0)}100%{transform:translateY(100vh)}}
   .wrap{max-width:1440px;margin:0 auto;padding:22px 24px 90px}
 
   header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;margin-bottom:22px}
@@ -69,6 +65,10 @@
 
   .maingrid{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-bottom:16px}
   @media(max-width:980px){.maingrid{grid-template-columns:1fr}}
+  .maingrid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px}
+  @media(max-width:1200px){.maingrid4{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:640px){.maingrid4{grid-template-columns:1fr}}
+  .bdlist{max-height:280px;overflow-y:auto}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
   .panel h3{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:600;color:var(--cyan);margin:0 0 14px;
     text-transform:uppercase;letter-spacing:.6px;display:flex;justify-content:space-between;align-items:center}
@@ -107,7 +107,6 @@
 </style>
 </head>
 <body>
-<div class="scanline"></div>
 <div class="wrap">
   <header>
     <div class="brand">
@@ -117,7 +116,10 @@
         <div class="tag">FY 2026–27 · North India Field Sales</div>
       </div>
     </div>
-    <div class="live"><span class="dot"></span> LIVE · <span id="lastUpdate">connecting...</span></div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <a href="admin.html" class="exportbtn" style="text-decoration:none;display:inline-block">⇧ Upload Data</a>
+      <div class="live"><span class="dot"></span> LIVE · <span id="lastUpdate">connecting...</span></div>
+    </div>
   </header>
 
   <div class="controlbar">
@@ -175,10 +177,6 @@
       <label>Search</label>
       <input type="text" id="searchBox" placeholder="SO / Party / Product...">
     </div>
-    <div class="ctl">
-      <label>&nbsp;</label>
-      <div class="chk"><input type="checkbox" id="excludeUnmapped"> <span>Exclude unmapped rows</span></div>
-    </div>
     <div class="spacer"></div>
     <button class="exportbtn" id="exportBtn" onclick="exportExcel()">⇩ Export Excel</button>
   </div>
@@ -194,6 +192,25 @@
     <div class="panel">
       <h3 id="leaderboardTitle">Leaderboard · SO <button class="tileExport" onclick="exportLeaderboardExcel()" title="Export this leaderboard">⇩</button></h3>
       <div id="leaderboard" style="max-height:280px;overflow-y:auto"></div>
+    </div>
+  </div>
+
+  <div class="maingrid4" id="breakdownGrid">
+    <div class="panel">
+      <h3>SO Wise Sales <button class="tileExport" onclick="exportBreakdownExcel('so')" title="Export SO wise sales">⇩</button></h3>
+      <div id="bdSo" class="bdlist"></div>
+    </div>
+    <div class="panel">
+      <h3>HQ Wise Sales <button class="tileExport" onclick="exportBreakdownExcel('hq')" title="Export HQ wise sales">⇩</button></h3>
+      <div id="bdHq" class="bdlist"></div>
+    </div>
+    <div class="panel">
+      <h3>Product Wise Sales <button class="tileExport" onclick="exportBreakdownExcel('pn')" title="Export product wise sales">⇩</button></h3>
+      <div id="bdPn" class="bdlist"></div>
+    </div>
+    <div class="panel">
+      <h3>State Wise Sales <button class="tileExport" onclick="exportBreakdownExcel('st')" title="Export state wise sales">⇩</button></h3>
+      <div id="bdSt" class="bdlist"></div>
     </div>
   </div>
 
@@ -241,7 +258,7 @@ let monthsMeta = {};       // key -> {rowCount, netTotal, importedAt}
 let cache = {};            // key -> array of records
 let state = {
   period:'month', month:null, quarter:'Q1', quarterMonth:'ALL', customFrom:null, customTo:null,
-  viewBy:'so', stateFilter:'ALL', search:'', excludeUnmapped:false
+  viewBy:'so', stateFilter:'ALL', search:''
 };
 let currentRows = [];
 
@@ -328,7 +345,7 @@ async function refresh(){
   state.stateFilter = stSel.value;
 
   let filtered = rows.filter(r=>{
-    if(state.excludeUnmapped && !r.mapped) return false;
+    if(!r.mapped) return false;
     if(state.stateFilter!=='ALL' && r.st!==state.stateFilter) return false;
     if(state.search){
       const s = state.search.toLowerCase();
@@ -341,6 +358,7 @@ async function refresh(){
   renderKPIs(filtered);
   renderTrend(filtered);
   renderLeaderboard(filtered);
+  renderBreakdowns(filtered);
   renderDetail(filtered);
 }
 
@@ -349,9 +367,9 @@ function fmtINR(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
 function renderKPIs(rows){
   const net = rows.reduce((a,r)=>a+r.na,0);
   const qty = rows.reduce((a,r)=>a+r.q,0);
-  const soSet = new Set(rows.filter(r=>r.mapped).map(r=>r.so));
+  const soSet = new Set(rows.map(r=>r.so));
   const partySet = new Set(rows.map(r=>r.cc));
-  const unmappedNet = rows.filter(r=>!r.mapped).reduce((a,r)=>a+r.na,0);
+  const productSet = new Set(rows.map(r=>r.pn));
 
   let deltaHtml = '';
   const prevKeys = prevPeriodKeys();
@@ -372,7 +390,7 @@ function renderKPIs(rows){
     <div class="kpi" style="--kc:var(--violet)"><div class="lbl">Quantity Sold</div><div class="val">${qty.toLocaleString('en-IN')}</div></div>
     <div class="kpi" style="--kc:var(--green)"><div class="lbl">Active SOs</div><div class="val">${soSet.size}</div></div>
     <div class="kpi" style="--kc:var(--amber)"><div class="lbl">Active Parties</div><div class="val">${partySet.size}</div></div>
-    <div class="kpi" style="--kc:var(--red)"><div class="lbl">Unmapped Net Sale</div><div class="val" style="font-size:20px">${fmtINR(unmappedNet)}</div></div>
+    <div class="kpi" style="--kc:var(--red)"><div class="lbl">Unique Products</div><div class="val" style="font-size:20px">${productSet.size}</div></div>
   `;
 }
 
@@ -416,9 +434,8 @@ function renderLeaderboard(rows){
   const agg = {};
   rows.forEach(r=>{
     const k = r[key] || 'UNKNOWN';
-    agg[k] = agg[k] || {net:0, qty:0, unmapped:false};
+    agg[k] = agg[k] || {net:0, qty:0};
     agg[k].net += r.na; agg[k].qty += r.q;
-    if(key==='so' && !r.mapped) agg[k].unmapped = true;
   });
   const entries = Object.entries(agg).sort((a,b)=>b[1].net-a[1].net);
   const max = entries.length ? entries[0][1].net : 1;
@@ -428,12 +445,46 @@ function renderLeaderboard(rows){
     <div class="lbrow">
       <div class="lbrank">${String(i+1).padStart(2,'0')}</div>
       <div class="lbname">
-        <span class="n">${name}${v.unmapped?'<span class="unmapped-badge">UNMAPPED</span>':''}</span>
+        <span class="n">${name}</span>
         <div class="lbbar"><i style="width:${Math.max(2,100*v.net/max)}%"></i></div>
       </div>
       <div class="lbval">${fmtINR(v.net)}<span class="sub">${v.qty.toLocaleString('en-IN')} units</span></div>
     </div>
   `).join('');
+}
+
+function aggBy(rows, key){
+  const agg = {};
+  rows.forEach(r=>{
+    const k = r[key] || 'UNKNOWN';
+    agg[k] = agg[k] || {net:0, qty:0};
+    agg[k].net += r.na; agg[k].qty += r.q;
+  });
+  return Object.entries(agg).sort((a,b)=>b[1].net-a[1].net);
+}
+
+function renderBdPanel(elId, rows, key){
+  const entries = aggBy(rows, key);
+  const max = entries.length ? entries[0][1].net : 1;
+  const box = document.getElementById(elId);
+  if(!entries.length){ box.innerHTML='<div class="empty">No data for this selection.</div>'; return; }
+  box.innerHTML = entries.slice(0,50).map(([name,v],i)=>`
+    <div class="lbrow">
+      <div class="lbrank">${String(i+1).padStart(2,'0')}</div>
+      <div class="lbname">
+        <span class="n">${name}</span>
+        <div class="lbbar"><i style="width:${Math.max(2,100*v.net/max)}%"></i></div>
+      </div>
+      <div class="lbval">${fmtINR(v.net)}<span class="sub">${v.qty.toLocaleString('en-IN')} units</span></div>
+    </div>
+  `).join('');
+}
+
+function renderBreakdowns(rows){
+  renderBdPanel('bdSo', rows, 'so');
+  renderBdPanel('bdHq', rows, 'hq');
+  renderBdPanel('bdPn', rows, 'pn');
+  renderBdPanel('bdSt', rows, 'st');
 }
 
 let sortKey='d', sortDir=-1;
@@ -449,7 +500,7 @@ function renderDetail(rows){
   body.innerHTML = sorted.map(r=>`
     <tr>
       <td>${r.d}</td>
-      <td>${r.so}${!r.mapped?'<span class="unmapped-badge">?</span>':''}</td>
+      <td>${r.so}</td>
       <td>${r.hq}</td><td>${r.st}</td><td>${r.cn}</td><td>${r.pn}</td><td>${r.cat}</td>
       <td class="num">${r.q}</td><td class="num">${fmtINR(r.na)}</td>
     </tr>`).join('') + (rows.length>500 ? `<tr><td colspan="9" class="empty">Showing first 500 of ${rows.length.toLocaleString('en-IN')} rows — refine filters or use Export for the full set.</td></tr>` : '');
@@ -499,7 +550,6 @@ document.getElementById('quarterMonthPick').addEventListener('change', e=>{ stat
 document.getElementById('customFrom').addEventListener('change', e=>{ state.customFrom=e.target.value; refresh(); });
 document.getElementById('customTo').addEventListener('change', e=>{ state.customTo=e.target.value; refresh(); });
 document.getElementById('stateFilter').addEventListener('change', e=>{ state.stateFilter=e.target.value; refresh(); });
-document.getElementById('excludeUnmapped').addEventListener('change', e=>{ state.excludeUnmapped=e.target.checked; refresh(); });
 let searchTimer;
 document.getElementById('searchBox').addEventListener('input', e=>{
   clearTimeout(searchTimer);
@@ -520,6 +570,17 @@ window.exportTrendExcel = function(){
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(trendRows), 'Daily Trend');
   XLSX.writeFile(wb, `PIL_OTC_Trend_${periodLabelStr()}.xlsx`);
+};
+
+window.exportBreakdownExcel = function(key){
+  if(!currentRows.length){ alert('No data to export for the current filters.'); return; }
+  const totalNet = currentRows.reduce((a,r)=>a+r.na,0);
+  const entries = aggBy(currentRows, key);
+  const rows = entries.map(([name,v],i)=>({Rank:i+1, [VIEW_LABELS[key]]:name, Quantity:Math.round(v.qty), 'Net Sale':Math.round(v.net),
+    '% of Total':totalNet ? (100*v.net/totalNet).toFixed(2)+'%' : '0%'}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), `${VIEW_LABELS[key]} Wise Sales`.slice(0,31));
+  XLSX.writeFile(wb, `PIL_OTC_${VIEW_LABELS[key].replace(/\s/g,'')}Wise_${periodLabelStr()}.xlsx`);
 };
 
 window.exportLeaderboardExcel = function(){
