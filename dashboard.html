@@ -382,7 +382,7 @@ function renderKPIs(rows){
   const prevKeys = prevPeriodKeys();
   if(prevKeys.length){
     const prevRows = prevKeys.flatMap(k=>cache[k]||[]);
-    const prevNet = prevRows.filter(r=> state.stateFilter==='ALL'||r.st===state.stateFilter).reduce((a,r)=>a+r.na,0);
+    const prevNet = prevRows.filter(r=> r.mapped && (state.stateFilter==='ALL'||r.st===state.stateFilter)).reduce((a,r)=>a+r.na,0);
     if(prevNet>0){
       const pct = ((net-prevNet)/prevNet*100);
       const cls = pct>0.5?'up':pct<-0.5?'down':'flat';
