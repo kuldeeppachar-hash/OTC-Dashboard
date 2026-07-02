@@ -73,6 +73,9 @@
   .panel h3{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:600;color:var(--cyan);margin:0 0 14px;
     text-transform:uppercase;letter-spacing:.6px;display:flex;justify-content:space-between;align-items:center}
   .panel h3 .n{color:var(--muted);font-size:11px;font-weight:500;text-transform:none;letter-spacing:0}
+  .tileExport{background:var(--panel2);border:1px solid var(--line2);color:var(--cyan);border-radius:6px;
+    padding:3px 9px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;letter-spacing:0;text-transform:none}
+  .tileExport:hover{background:var(--cyan);color:#00212A}
 
   .lbrow{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:8px 2px;
     border-bottom:1px solid var(--line);font-size:13px}
@@ -140,6 +143,12 @@
         <option value="Q4">Q4 · Jan–Mar 2027</option>
       </select>
     </div>
+    <div class="ctl" id="quarterMonthWrap" style="display:none">
+      <label>Month in Quarter</label>
+      <select id="quarterMonthPick">
+        <option value="ALL">All 3 Months</option>
+      </select>
+    </div>
     <div class="ctl" id="customPickWrap" style="display:none">
       <label>Date Range</label>
       <div style="display:flex;gap:6px">
@@ -178,18 +187,18 @@
 
   <div class="maingrid">
     <div class="panel">
-      <h3>Daily Net Sale Trend <span class="n" id="trendRange"></span></h3>
+      <h3>Daily Net Sale Trend <span class="n" id="trendRange"></span> <button class="tileExport" onclick="exportTrendExcel()" title="Export this trend">⇩</button></h3>
       <svg id="trendSvg" viewBox="0 0 900 230" preserveAspectRatio="none"></svg>
       <div class="trendmeta"><span id="trendMin"></span><span id="trendMax"></span></div>
     </div>
     <div class="panel">
-      <h3 id="leaderboardTitle">Leaderboard · SO</h3>
+      <h3 id="leaderboardTitle">Leaderboard · SO <button class="tileExport" onclick="exportLeaderboardExcel()" title="Export this leaderboard">⇩</button></h3>
       <div id="leaderboard" style="max-height:280px;overflow-y:auto"></div>
     </div>
   </div>
 
   <div class="gridpanel">
-    <h3>Detail Rows <span class="n" id="rowCount"></span></h3>
+    <h3>Detail Rows <span class="n" id="rowCount"></span> <button class="tileExport" onclick="exportDetailExcel()" title="Export detail rows">⇩</button></h3>
     <div class="tablewrap">
       <table id="detailTable">
         <thead><tr>
@@ -231,7 +240,7 @@ const FY_MONTHS = [...QUARTERS.Q1,...QUARTERS.Q2,...QUARTERS.Q3,...QUARTERS.Q4];
 let monthsMeta = {};       // key -> {rowCount, netTotal, importedAt}
 let cache = {};            // key -> array of records
 let state = {
-  period:'month', month:null, quarter:'Q1', customFrom:null, customTo:null,
+  period:'month', month:null, quarter:'Q1', quarterMonth:'ALL', customFrom:null, customTo:null,
   viewBy:'so', stateFilter:'ALL', search:'', excludeUnmapped:false
 };
 let currentRows = [];
@@ -270,7 +279,11 @@ async function ensureMonths(keys){
 
 function periodKeys(){
   if(state.period==='month') return state.month ? [state.month] : [];
-  if(state.period==='quarter') return QUARTERS[state.quarter].filter(k=>monthsMeta[k]);
+  if(state.period==='quarter'){
+    const months = QUARTERS[state.quarter].filter(k=>monthsMeta[k]);
+    if(state.quarterMonth && state.quarterMonth!=='ALL') return months.filter(k=>k===state.quarterMonth);
+    return months;
+  }
   if(state.period==='fytd') return FY_MONTHS.filter(k=>monthsMeta[k]);
   if(state.period==='custom') {
     if(!state.customFrom || !state.customTo) return Object.keys(monthsMeta);
@@ -458,7 +471,9 @@ document.querySelectorAll('#periodTabs .tab').forEach(t=>{
     state.period = t.dataset.p;
     document.getElementById('monthPickWrap').style.display = state.period==='month' ? 'flex' : 'none';
     document.getElementById('quarterPickWrap').style.display = state.period==='quarter' ? 'flex' : 'none';
+    document.getElementById('quarterMonthWrap').style.display = state.period==='quarter' ? 'flex' : 'none';
     document.getElementById('customPickWrap').style.display = state.period==='custom' ? 'flex' : 'none';
+    if(state.period==='quarter') populateQuarterMonths();
     refresh();
   });
 });
@@ -470,8 +485,17 @@ document.querySelectorAll('#viewByTabs .tab').forEach(t=>{
     refresh();
   });
 });
+function populateQuarterMonths(){
+  const sel = document.getElementById('quarterMonthPick');
+  const months = QUARTERS[state.quarter].filter(k=>monthsMeta[k]);
+  sel.innerHTML = '<option value="ALL">All 3 Months</option>' +
+    months.map(k=>`<option value="${k}">${monthLabel(k)}</option>`).join('');
+  state.quarterMonth = 'ALL';
+  sel.value = 'ALL';
+}
 document.getElementById('monthPick').addEventListener('change', e=>{ state.month=e.target.value; refresh(); });
-document.getElementById('quarterPick').addEventListener('change', e=>{ state.quarter=e.target.value; refresh(); });
+document.getElementById('quarterPick').addEventListener('change', e=>{ state.quarter=e.target.value; populateQuarterMonths(); refresh(); });
+document.getElementById('quarterMonthPick').addEventListener('change', e=>{ state.quarterMonth=e.target.value; refresh(); });
 document.getElementById('customFrom').addEventListener('change', e=>{ state.customFrom=e.target.value; refresh(); });
 document.getElementById('customTo').addEventListener('change', e=>{ state.customTo=e.target.value; refresh(); });
 document.getElementById('stateFilter').addEventListener('change', e=>{ state.stateFilter=e.target.value; refresh(); });
@@ -481,6 +505,52 @@ document.getElementById('searchBox').addEventListener('input', e=>{
   clearTimeout(searchTimer);
   searchTimer = setTimeout(()=>{ state.search=e.target.value; refresh(); }, 250);
 });
+
+function periodLabelStr(){
+  if(state.period==='month') return state.month || 'period';
+  if(state.period==='quarter') return state.quarterMonth!=='ALL' ? state.quarterMonth : state.quarter;
+  return state.period;
+}
+
+window.exportTrendExcel = function(){
+  if(!currentRows.length){ alert('No data to export for the current filters.'); return; }
+  const byDay = {};
+  currentRows.forEach(r=>{ byDay[r.d]=(byDay[r.d]||0)+r.na; });
+  const trendRows = Object.keys(byDay).sort().map(d=>({Date:d, 'Net Sale':Math.round(byDay[d])}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(trendRows), 'Daily Trend');
+  XLSX.writeFile(wb, `PIL_OTC_Trend_${periodLabelStr()}.xlsx`);
+};
+
+window.exportLeaderboardExcel = function(){
+  if(!currentRows.length){ alert('No data to export for the current filters.'); return; }
+  const key = state.viewBy;
+  const agg = {};
+  currentRows.forEach(r=>{
+    const k = r[key] || 'UNKNOWN';
+    agg[k] = agg[k] || {Qty:0, NetSale:0};
+    agg[k].Qty += r.q; agg[k].NetSale += r.na;
+  });
+  const totalNet = currentRows.reduce((a,r)=>a+r.na,0);
+  const rows = Object.entries(agg).sort((a,b)=>b[1].NetSale-a[1].NetSale)
+    .map(([name,v],i)=>({Rank:i+1, [VIEW_LABELS[key]]:name, Quantity:Math.round(v.Qty), 'Net Sale':Math.round(v.NetSale),
+      '% of Total':totalNet ? (100*v.NetSale/totalNet).toFixed(2)+'%' : '0%'}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), `Leaderboard ${VIEW_LABELS[key]}`.slice(0,31));
+  XLSX.writeFile(wb, `PIL_OTC_Leaderboard_${VIEW_LABELS[key].replace(/\s/g,'')}_${periodLabelStr()}.xlsx`);
+};
+
+window.exportDetailExcel = function(){
+  if(!currentRows.length){ alert('No data to export for the current filters.'); return; }
+  const rows = currentRows.map(r=>({
+    Date:r.d, SO:r.so, Mapped:r.mapped?'Yes':'No', ASM:r.asm, RSM:r.rsm, ZSM:r.zsm,
+    Area_HQ:r.hq, State:r.st, Party:r.cn, CustomerCode:r.cc,
+    Product:r.pn, ProductCode:r.pc, Category:r.cat, Quantity:r.q, NetSale:Math.round(r.na)
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Detail Rows');
+  XLSX.writeFile(wb, `PIL_OTC_Detail_${periodLabelStr()}.xlsx`);
+};
 
 window.exportExcel = function(){
   if(!currentRows.length){ alert('No data to export for the current filters.'); return; }
@@ -514,8 +584,7 @@ window.exportExcel = function(){
   }));
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRows), 'Detail Rows');
 
-  const periodLabel = state.period==='month' ? state.month : state.period;
-  XLSX.writeFile(wb, `PIL_OTC_${periodLabel}_${VIEW_LABELS[key].replace(/\s/g,'')}.xlsx`);
+  XLSX.writeFile(wb, `PIL_OTC_${periodLabelStr()}_${VIEW_LABELS[key].replace(/\s/g,'')}.xlsx`);
 };
 
 (async function init(){
