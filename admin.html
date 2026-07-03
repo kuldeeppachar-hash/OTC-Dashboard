@@ -11,13 +11,21 @@
   :root{
     --bg:#0A0E14; --panel:#0F1520; --panel2:#141B29; --line:#212B3B;
     --cyan:#00E5FF; --amber:#FFB020; --green:#34D399; --red:#F87171;
-    --text:#E8EDF4; --muted:#7A8699;
+    --text:#E8EDF4; --muted:#7A8699; --oncolor:#00212A; --ondanger:#2A0000;
+    --headgrad-start:#FFFFFF;
+  }
+  html[data-theme="light"]{
+    --bg:#F4F6FA; --panel:#FFFFFF; --panel2:#F1F4F9; --line:#DCE2ED;
+    --cyan:#0088A3; --amber:#B8720E; --green:#1E9A6C; --red:#D93636;
+    --text:#141A24; --muted:#5A6478; --oncolor:#FFFFFF; --ondanger:#FFFFFF;
+    --headgrad-start:#141A24;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;
+    transition:background-color .25s ease, color .25s ease}
   .wrap{max-width:1100px;margin:0 auto;padding:32px 20px 80px}
   h1{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:28px;letter-spacing:.5px;margin:0 0 4px;
-     background:linear-gradient(90deg,#fff,var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
+     background:linear-gradient(90deg,var(--headgrad-start),var(--cyan));-webkit-background-clip:text;background-clip:text;color:transparent}
   .sub{color:var(--muted);font-size:13px;margin-bottom:28px}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:22px 24px;margin-bottom:20px}
   .card h2{font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:600;margin:0 0 4px;color:var(--cyan)}
@@ -29,13 +37,16 @@
   }
   input[type=file]{padding:8px}
   button{
-    background:var(--cyan);color:#00212A;border:none;border-radius:8px;padding:11px 20px;font-weight:700;
+    background:var(--cyan);color:var(--oncolor);border:none;border-radius:8px;padding:11px 20px;font-weight:700;
     font-size:13px;letter-spacing:.3px;cursor:pointer;font-family:'Inter',sans-serif;transition:.15s
   }
   button:hover{filter:brightness(1.12)}
   button:disabled{opacity:.4;cursor:not-allowed}
   button.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
-  button.danger{background:var(--red);color:#2A0000}
+  button.danger{background:var(--red);color:var(--ondanger)}
+  .themetoggle{width:38px;height:38px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);
+    color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .themetoggle:hover{border-color:var(--cyan)}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
   .status{font-size:12.5px;margin-top:10px;padding:10px 12px;border-radius:8px;display:none;font-family:'JetBrains Mono',monospace}
   .status.show{display:block}
@@ -61,9 +72,12 @@
 </head>
 <body>
 <div class="wrap">
-  <div style="margin-bottom:18px">
+  <div style="margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:12px">
     <a href="dashboard.html" style="display:inline-flex;align-items:center;gap:6px;color:var(--muted);
       text-decoration:none;font-size:12.5px;border:1px solid var(--line);padding:7px 12px;border-radius:8px">← Back to Dashboard</a>
+    <button id="themeToggle" class="themetoggle" title="Toggle light/dark mode" aria-label="Toggle theme" type="button">
+      <span class="themetoggle-icon">☀️</span>
+    </button>
   </div>
 
   <div id="loginGate" class="card">
@@ -490,6 +504,26 @@ async function deleteMonth(k){
   loadMonthsList();
 }
 window.deleteMonth = deleteMonth;
+
+// --- theme toggle (shared with dashboard.html via localStorage) ---
+(function initTheme(){
+  const root = document.documentElement;
+  const btn = document.getElementById('themeToggle');
+  const icon = btn.querySelector('.themetoggle-icon');
+  const saved = localStorage.getItem('pil-theme');
+  const systemLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+  const initial = saved || (systemLight ? 'light' : 'dark');
+  applyTheme(initial);
+  btn.addEventListener('click', ()=>{
+    const next = root.getAttribute('data-theme')==='light' ? 'dark' : 'light';
+    applyTheme(next);
+    localStorage.setItem('pil-theme', next);
+  });
+  function applyTheme(mode){
+    if(mode==='light'){ root.setAttribute('data-theme','light'); icon.textContent='🌙'; btn.title='Switch to dark mode'; }
+    else{ root.removeAttribute('data-theme'); icon.textContent='☀️'; btn.title='Switch to light mode'; }
+  }
+})();
 </script>
 </body>
 </html>

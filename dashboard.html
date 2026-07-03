@@ -13,35 +13,34 @@
     --panel:#0E141F; --panel2:#131A28; --line:#1D2635; --line2:#263047;
     --cyan:#00E5FF; --cyan-dim:#0891A8; --amber:#FFB020; --green:#34D399; --red:#F87171; --violet:#8B7CF6;
     --text:#EAEEF5; --muted:#71809A; --muted2:#4C5A72;
-    --h1-color:#fff;
+    --glow1:rgba(0,229,255,.07); --glow2:rgba(139,124,246,.06); --rowhover:rgba(0,229,255,.04);
+    --oncolor:#00212A;
   }
   html[data-theme="light"]{
-    --bg:#F4F6FA; --bg2:#EBEFF5;
-    --panel:#FFFFFF; --panel2:#F1F4F9; --line:#DCE3ED; --line2:#CBD5E3;
-    --cyan:#0089A8; --cyan-dim:#006A82; --amber:#B36B00; --green:#0F8F5E; --red:#D5342C; --violet:#6A54D4;
-    --text:#141B27; --muted:#5B6B84; --muted2:#3E4C63;
-    --h1-color:#141B27;
+    --bg:#F4F6FA; --bg2:#EDF0F6;
+    --panel:#FFFFFF; --panel2:#F1F4F9; --line:#DCE2ED; --line2:#C6CFDE;
+    --cyan:#0088A3; --cyan-dim:#0891A8; --amber:#B8720E; --green:#1E9A6C; --red:#D93636; --violet:#6C4FD6;
+    --text:#141A24; --muted:#5A6478; --muted2:#7C879B;
+    --glow1:rgba(0,136,163,.05); --glow2:rgba(108,79,214,.04); --rowhover:rgba(0,136,163,.06);
+    --oncolor:#FFFFFF;
   }
-  html[data-theme="light"] tbody tr:hover{background:rgba(0,137,168,.06)}
-  html{transition:background .2s}
-  body{transition:background .2s,color .2s}
-  .panel,.kpi,.controlbar,.gridpanel{transition:background .2s,border-color .2s}
   *{box-sizing:border-box}
   body{
     margin:0;background:
-      radial-gradient(ellipse 1200px 600px at 15% -10%, rgba(0,229,255,.07), transparent 60%),
-      radial-gradient(ellipse 900px 500px at 100% 0%, rgba(139,124,246,.06), transparent 55%),
+      radial-gradient(ellipse 1200px 600px at 15% -10%, var(--glow1), transparent 60%),
+      radial-gradient(ellipse 900px 500px at 100% 0%, var(--glow2), transparent 55%),
       var(--bg);
     color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;
+    transition:background-color .25s ease, color .25s ease;
   }
   .wrap{max-width:1440px;margin:0 auto;padding:22px 24px 90px}
 
   header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;margin-bottom:22px}
   .brand{display:flex;align-items:center;gap:12px}
   .brand .mark{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,var(--cyan),var(--violet));
-    display:flex;align-items:center;justify-content:center;font-family:'Rajdhani';font-weight:700;color:#00141A;font-size:16px;
+    display:flex;align-items:center;justify-content:center;font-family:'Rajdhani';font-weight:700;color:var(--oncolor);font-size:16px;
     box-shadow:0 0 22px rgba(0,229,255,.35)}
-  h1{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px;margin:0;color:var(--h1-color)}
+  h1{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px;margin:0;color:var(--text)}
   h1 span{color:var(--cyan)}
   .tag{font-size:11px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px}
   .live{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace}
@@ -59,10 +58,10 @@
   select:focus,input:focus{border-color:var(--cyan)}
   .tabs{display:flex;gap:4px;background:var(--panel2);padding:4px;border-radius:9px;border:1px solid var(--line2)}
   .tab{padding:7px 14px;font-size:12.5px;font-weight:600;color:var(--muted);border-radius:6px;cursor:pointer;user-select:none;white-space:nowrap}
-  .tab.active{background:var(--cyan);color:#00212A}
+  .tab.active{background:var(--cyan);color:var(--oncolor)}
   .chk{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer}
   .spacer{flex:1}
-  .exportbtn{background:linear-gradient(135deg,var(--cyan),#00A9BF);border:none;color:#00212A;font-weight:700;
+  .exportbtn{background:linear-gradient(135deg,var(--cyan),#00A9BF);border:none;color:var(--oncolor);font-weight:700;
     padding:10px 18px;border-radius:9px;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;letter-spacing:.2px}
   .exportbtn:hover{filter:brightness(1.1)}
   .exportbtn:disabled{opacity:.4}
@@ -71,7 +70,7 @@
   .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden}
   .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc,var(--cyan));opacity:.7}
   .kpi .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
-  .kpi .val{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:28px;color:var(--h1-color);line-height:1}
+  .kpi .val{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:28px;color:var(--text);line-height:1}
   .kpi .delta{font-size:12px;margin-top:8px;font-family:'JetBrains Mono',monospace}
   .delta.up{color:var(--green)} .delta.down{color:var(--red)} .delta.flat{color:var(--muted)}
 
@@ -87,7 +86,7 @@
   .panel h3 .n{color:var(--muted);font-size:11px;font-weight:500;text-transform:none;letter-spacing:0}
   .tileExport{background:var(--panel2);border:1px solid var(--line2);color:var(--cyan);border-radius:6px;
     padding:3px 9px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;letter-spacing:0;text-transform:none}
-  .tileExport:hover{background:var(--cyan);color:#00212A}
+  .tileExport:hover{background:var(--cyan);color:var(--oncolor)}
 
   .lbrow{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:8px 2px;
     border-bottom:1px solid var(--line);font-size:13px}
@@ -110,12 +109,16 @@
     letter-spacing:.4px;padding:9px 10px;text-align:left;border-bottom:1px solid var(--line2);cursor:pointer;white-space:nowrap}
   thead th:hover{color:var(--cyan)}
   tbody td{padding:8px 10px;border-bottom:1px solid var(--line);color:var(--text)}
-  tbody tr:hover{background:rgba(0,229,255,.04)}
+  tbody tr:hover{background:var(--rowhover)}
   td.num,th.num{text-align:right;font-family:'JetBrains Mono',monospace}
   .unmapped-badge{display:inline-block;background:rgba(255,176,32,.15);color:var(--amber);font-size:10px;
     padding:1px 7px;border-radius:10px;margin-left:6px;font-weight:600}
   .empty{text-align:center;color:var(--muted);padding:40px;font-size:13px}
   footer{text-align:center;color:var(--muted2);font-size:11px;margin-top:30px;font-family:'JetBrains Mono',monospace}
+  .themetoggle{width:38px;height:38px;border-radius:9px;background:var(--panel2);border:1px solid var(--line2);
+    color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;
+    transition:background-color .2s ease,border-color .2s ease}
+  .themetoggle:hover{border-color:var(--cyan)}
   *{scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
   *::-webkit-scrollbar{width:7px;height:7px}
   *::-webkit-scrollbar-track{background:transparent}
@@ -134,9 +137,9 @@
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:14px">
-      <button id="themeToggle" type="button" title="Toggle light/dark mode"
-        style="background:var(--panel2);border:1px solid var(--line2);color:var(--text);border-radius:8px;
-        width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;padding:0">☀</button>
+      <button id="themeToggle" class="themetoggle" title="Toggle light/dark mode" aria-label="Toggle theme">
+        <span class="themetoggle-icon">☀️</span>
+      </button>
       <a href="admin.html" class="exportbtn" style="text-decoration:none;display:inline-block">⇧ Upload Data</a>
       <div class="live"><span class="dot"></span> LIVE · <span id="lastUpdate">connecting...</span></div>
     </div>
@@ -416,6 +419,9 @@ function renderKPIs(rows){
   `;
 }
 
+function themeColor(varName){
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+}
 function renderTrend(rows){
   const byDay = {};
   rows.forEach(r=>{ byDay[r.d]=(byDay[r.d]||0)+r.na; });
@@ -448,22 +454,23 @@ function renderTrend(rows){
   const linePath = pts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
   const areaPath = linePath + ` L${pts[pts.length-1][0].toFixed(1)},${H-padBottom} L${pts[0][0].toFixed(1)},${H-padBottom} Z`;
   const shortDate = d => { const [y,m,dd] = d.split('-'); return `${dd}/${m}`; };
+  const textC = themeColor('--text'), mutedC = themeColor('--muted'), cyanC = themeColor('--cyan');
   const labels = weekList.map((w,i)=>{
     const range = `${shortDate(w.days[0])}–${shortDate(w.days[w.days.length-1])}`;
-    return `<text x="${pts[i][0].toFixed(1)}" y="${H+16}" font-size="10.5" font-weight="600" fill="#EAEEF5" text-anchor="middle" font-family="JetBrains Mono, monospace">Week ${w.idx+1}</text>
-            <text x="${pts[i][0].toFixed(1)}" y="${H+29}" font-size="9.5" fill="#71809A" text-anchor="middle" font-family="JetBrains Mono, monospace">${range}</text>`;
+    return `<text x="${pts[i][0].toFixed(1)}" y="${H+16}" font-size="10.5" font-weight="600" fill="${textC}" text-anchor="middle" font-family="JetBrains Mono, monospace">Week ${w.idx+1}</text>
+            <text x="${pts[i][0].toFixed(1)}" y="${H+29}" font-size="9.5" fill="${mutedC}" text-anchor="middle" font-family="JetBrains Mono, monospace">${range}</text>`;
   }).join('');
   svg.innerHTML = `
     <defs>
       <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#00E5FF" stop-opacity="0.35"/>
-        <stop offset="100%" stop-color="#00E5FF" stop-opacity="0"/>
+        <stop offset="0%" stop-color="${cyanC}" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="${cyanC}" stop-opacity="0"/>
       </linearGradient>
     </defs>
     <path d="${areaPath}" fill="url(#areaGrad)"/>
-    <path d="${linePath}" fill="none" stroke="#00E5FF" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"
+    <path d="${linePath}" fill="none" stroke="${cyanC}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"
       style="filter:drop-shadow(0 0 6px rgba(0,229,255,.6))"/>
-    ${pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="#00E5FF" opacity="0.9"><title>Week ${weekList[i].idx+1}: ${fmtINR(weekList[i].net)}</title></circle>`).join('')}
+    ${pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${cyanC}" opacity="0.9"><title>Week ${weekList[i].idx+1}: ${fmtINR(weekList[i].net)}</title></circle>`).join('')}
     ${labels}
   `;
   document.getElementById('trendMin').textContent = 'Low: ' + fmtINR(min<0?0:min);
@@ -627,6 +634,30 @@ document.getElementById('searchBox').addEventListener('input', e=>{
   clearTimeout(searchTimer);
   searchTimer = setTimeout(()=>{ state.search=e.target.value; refresh(); }, 250);
 });
+
+// --- theme toggle (light mode for outdoor/daylight mobile viewing) ---
+(function initTheme(){
+  const root = document.documentElement;
+  const btn = document.getElementById('themeToggle');
+  const icon = btn.querySelector('.themetoggle-icon');
+  const saved = localStorage.getItem('pil-theme');
+  const systemLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+  const initial = saved || (systemLight ? 'light' : 'dark');
+  applyTheme(initial);
+
+  btn.addEventListener('click', ()=>{
+    const next = root.getAttribute('data-theme')==='light' ? 'dark' : 'light';
+    applyTheme(next);
+    localStorage.setItem('pil-theme', next);
+    // re-render anything that injects colors directly (SVG trend chart) so it picks up the new theme
+    try{ if(typeof currentRows!=='undefined' && currentRows) renderTrend(currentRows); }catch(e){}
+  });
+
+  function applyTheme(mode){
+    if(mode==='light'){ root.setAttribute('data-theme','light'); icon.textContent='🌙'; btn.title='Switch to dark mode'; }
+    else{ root.removeAttribute('data-theme'); icon.textContent='☀️'; btn.title='Switch to light mode'; }
+  }
+})();
 
 function periodLabelStr(){
   if(state.period==='month') return state.month || 'period';
