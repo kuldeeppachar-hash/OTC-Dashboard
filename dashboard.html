@@ -3,225 +3,412 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PIL OTC — Sales Command</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<title>PIL OTC — Sales Intelligence (Live)</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
-  :root{
-    --bg:#080B10; --bg2:#0B0F16;
-    --panel:#0E141F; --panel2:#131A28; --line:#1D2635; --line2:#263047;
-    --cyan:#00E5FF; --cyan-dim:#0891A8; --amber:#FFB020; --green:#34D399; --red:#F87171; --violet:#8B7CF6;
-    --text:#EAEEF5; --muted:#71809A; --muted2:#4C5A72;
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  :root {
+    --bg:#060a12;--surface:#0d1520;--surface2:#111c2e;
+    --border:rgba(56,189,248,0.12);--border2:rgba(56,189,248,0.06);
+    --cyan:#38bdf8;--cyan-dim:rgba(56,189,248,0.15);--cyan-glow:rgba(56,189,248,0.08);
+    --green:#4ade80;--green-dim:rgba(74,222,128,0.15);
+    --red:#f87171;--red-dim:rgba(248,113,113,0.15);
+    --amber:#fbbf24;--amber-dim:rgba(251,191,36,0.15);
+    --purple:#a78bfa;--purple-dim:rgba(167,139,250,0.12);
+    --text:#e2e8f0;--text-dim:#64748b;--text-mid:#94a3b8;
+    --mono:'JetBrains Mono',monospace;--sans:'Space Grotesk',sans-serif;
   }
-  *{box-sizing:border-box}
-  body{
-    margin:0;background:
-      radial-gradient(ellipse 1200px 600px at 15% -10%, rgba(0,229,255,.07), transparent 60%),
-      radial-gradient(ellipse 900px 500px at 100% 0%, rgba(139,124,246,.06), transparent 55%),
-      var(--bg);
-    color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;
+  [data-theme="light"] {
+    --bg:#f4f6fa;--surface:#ffffff;--surface2:#eef1f6;
+    --border:rgba(2,58,94,0.18);--border2:rgba(2,58,94,0.10);
+    --cyan:#0284c7;--cyan-dim:rgba(2,132,199,0.12);--cyan-glow:rgba(2,132,199,0.06);
+    --green:#16a34a;--green-dim:rgba(22,163,74,0.14);
+    --red:#dc2626;--red-dim:rgba(220,38,38,0.14);
+    --amber:#b45309;--amber-dim:rgba(180,83,9,0.14);
+    --purple:#7c3aed;--purple-dim:rgba(124,58,237,0.12);
+    --text:#0f172a;--text-dim:#64748b;--text-mid:#334155;
   }
-  .wrap{max-width:1440px;margin:0 auto;padding:22px 24px 90px}
+  [data-theme="light"] body::before{background-image:linear-gradient(rgba(2,58,94,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(2,58,94,0.04) 1px,transparent 1px);}
+  [data-theme="light"] .header{background:rgba(244,246,250,0.95);}
+  [data-theme="light"] .logo-mark{color:#fff;}
+  [data-theme="light"] #loadingOverlay{background:var(--bg);}
+  .theme-toggle{background:var(--surface2);border:1px solid var(--border);color:var(--text-mid);font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all 0.15s;}
+  .theme-toggle:hover{border-color:var(--cyan);color:var(--cyan);}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(56,189,248,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(56,189,248,0.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+  .header{position:sticky;top:0;z-index:100;background:rgba(6,10,18,0.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;}
+  .header-left{display:flex;align-items:center;gap:16px;}
+  .logo-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--cyan),var(--purple));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#000;}
+  .logo-text{font-size:15px;font-weight:600;letter-spacing:-0.3px;}
+  .logo-text span{color:var(--cyan);}
+  .header-tag{background:var(--cyan-dim);border:1px solid var(--border);color:var(--cyan);font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:4px;letter-spacing:0.5px;}
+  .header-right{display:flex;align-items:center;gap:12px;}
+  .live-pill{display:flex;align-items:center;gap:6px;background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.25);padding:4px 10px;border-radius:20px;font-size:11px;color:var(--green);font-family:var(--mono);}
+  .live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse-green 2s infinite;}
+  @keyframes pulse-green{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(74,222,128,0.4);}50%{opacity:0.7;box-shadow:0 0 0 4px rgba(74,222,128,0);}}
+  .header-date{font-family:var(--mono);font-size:11px;color:var(--text-dim);}
+  .filter-bar{position:relative;z-index:10;background:var(--surface);border-bottom:1px solid var(--border2);padding:10px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .filter-label{font-size:11px;color:var(--text-dim);font-family:var(--mono);}
+  .filter-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-mid);font-family:var(--sans);font-size:12px;padding:5px 12px;border-radius:6px;cursor:pointer;transition:all 0.15s;}
+  .filter-btn:hover,.filter-btn.active{background:var(--cyan-dim);border-color:var(--cyan);color:var(--cyan);}
+  main{position:relative;z-index:1;padding:20px 24px;max-width:1600px;margin:0 auto;}
+  .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+  .kpi-card{background:var(--surface);border:1px solid var(--border2);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden;transition:border-color 0.2s;animation:fadeUp 0.3s ease both;}
+  .kpi-card:hover{border-color:var(--border);}
+  .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+  .kpi-card.cyan::before{background:linear-gradient(90deg,transparent,var(--cyan),transparent);}
+  .kpi-card.green::before{background:linear-gradient(90deg,transparent,var(--green),transparent);}
+  .kpi-card.amber::before{background:linear-gradient(90deg,transparent,var(--amber),transparent);}
+  .kpi-card.purple::before{background:linear-gradient(90deg,transparent,var(--purple),transparent);}
+  .kpi-label{font-size:10px;font-family:var(--mono);color:var(--text-dim);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+  .kpi-label::before{content:'//';color:var(--cyan);opacity:0.5;}
+  .kpi-value{font-size:28px;font-weight:700;letter-spacing:-1px;line-height:1;}
+  .kpi-card.cyan .kpi-value{color:var(--cyan);}
+  .kpi-card.green .kpi-value{color:var(--green);}
+  .kpi-card.amber .kpi-value{color:var(--amber);}
+  .kpi-card.purple .kpi-value{color:var(--purple);}
+  .kpi-sub{margin-top:8px;font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px;}
+  .kpi-glow{position:absolute;bottom:-20px;right:-10px;width:80px;height:80px;border-radius:50%;filter:blur(30px);opacity:0.08;}
+  .kpi-card.cyan .kpi-glow{background:var(--cyan);}
+  .kpi-card.green .kpi-glow{background:var(--green);}
+  .kpi-card.amber .kpi-glow{background:var(--amber);}
+  .kpi-card.purple .kpi-glow{background:var(--purple);}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+  .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;}
+  .grid-5-7{display:grid;grid-template-columns:5fr 7fr;gap:14px;margin-bottom:14px;}
+  .grid-6-4{display:grid;grid-template-columns:6fr 4fr;gap:14px;margin-bottom:14px;}
+  .panel{background:var(--surface);border:1px solid var(--border2);border-radius:12px;overflow:hidden;animation:fadeUp 0.4s ease both;}
+  .panel-header{padding:14px 18px;border-bottom:1px solid var(--border2);display:flex;align-items:center;justify-content:space-between;}
+  .panel-title{font-size:11px;font-weight:600;color:var(--text-mid);font-family:var(--mono);letter-spacing:0.5px;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+  .panel-title-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);}
+  .panel-body{padding:16px 18px;}
+  .bar-chart{display:flex;flex-direction:column;gap:10px;}
+  .bar-row{display:grid;grid-template-columns:120px 1fr 70px;align-items:center;gap:10px;}
+  .bar-name{font-size:11px;color:var(--text-mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono);}
+  .bar-track{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:3px;transition:width 1s cubic-bezier(0.4,0,0.2,1);}
+  .bar-amount{font-size:11px;font-family:var(--mono);color:var(--text-mid);text-align:right;}
+  .chart-container{position:relative;}
+  svg.spark{width:100%;overflow:visible;}
+  .zone-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  .zone-card{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:14px;position:relative;overflow:hidden;}
+  .zone-name{font-size:10px;font-family:var(--mono);color:var(--text-dim);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;}
+  .zone-value{font-size:20px;font-weight:700;color:var(--cyan);letter-spacing:-0.5px;}
+  .zone-pct{font-size:11px;margin-top:4px;}
+  .zone-bar{margin-top:10px;height:3px;background:var(--surface);border-radius:2px;overflow:hidden;}
+  .zone-bar-fill{height:100%;background:var(--cyan);border-radius:2px;}
+  .data-table{width:100%;border-collapse:collapse;}
+  .data-table th{font-size:10px;font-family:var(--mono);color:var(--text-dim);text-transform:uppercase;letter-spacing:0.6px;padding:8px 12px;border-bottom:1px solid var(--border2);text-align:left;font-weight:500;background:var(--surface2);}
+  .data-table td{padding:9px 12px;font-size:12px;color:var(--text-mid);border-bottom:1px solid var(--border2);font-family:var(--mono);}
+  .data-table tr:last-child td{border-bottom:none;}
+  .data-table tr:hover td{background:rgba(56,189,248,0.03);}
+  .rank-num{color:var(--text-dim);font-size:10px;}
+  .amount-cell{color:var(--text);font-weight:500;}
+  .so-tag{background:var(--cyan-dim);color:var(--cyan);padding:2px 7px;border-radius:4px;font-size:10px;font-family:var(--sans);display:inline-block;}
+  .state-badge{display:inline-block;padding:2px 7px;border-radius:4px;font-size:10px;font-family:var(--sans);}
+  .state-DL{background:rgba(167,139,250,0.15);color:var(--purple);}
+  .state-UP{background:rgba(56,189,248,0.12);color:var(--cyan);}
+  .state-RJ{background:rgba(251,191,36,0.12);color:var(--amber);}
+  .state-HR{background:rgba(74,222,128,0.12);color:var(--green);}
+  .state-PB{background:rgba(248,113,113,0.12);color:var(--red);}
+  .ring-wrap{display:flex;align-items:center;gap:20px;}
+  .ring-legend{display:flex;flex-direction:column;gap:8px;flex:1;}
+  .ring-item{display:flex;align-items:center;gap:8px;}
+  .ring-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+  .ring-item-label{font-size:11px;color:var(--text-mid);flex:1;}
+  .ring-item-val{font-size:11px;font-family:var(--mono);color:var(--text);}
+  .heat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
+  .heat-cell{border-radius:6px;padding:8px 6px;text-align:center;cursor:default;transition:transform 0.15s;position:relative;overflow:hidden;}
+  .heat-cell:hover{transform:scale(1.04);z-index:5;}
+  .heat-cell-name{font-size:9px;line-height:1.3;color:rgba(255,255,255,0.7);font-family:var(--sans);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .heat-cell-val{font-size:11px;font-weight:600;color:#fff;font-family:var(--mono);margin-top:4px;}
+  .trend-labels{display:flex;justify-content:space-between;font-size:10px;font-family:var(--mono);color:var(--text-dim);margin-top:6px;padding:0 2px;}
+  .scroll-body{max-height:320px;overflow-y:auto;}
+  .scroll-body::-webkit-scrollbar{width:4px;}
+  .scroll-body::-webkit-scrollbar-track{background:transparent;}
+  .scroll-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+  .chip{background:var(--surface2);border:1px solid var(--border2);color:var(--text-dim);font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:4px;}
+  .pct-badge{font-family:var(--mono);font-size:13px;font-weight:600;}
+  .green-text{color:var(--green);}
+  .red-text{color:var(--red);}
+  .amber-text{color:var(--amber);}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+  .kpi-card:nth-child(1){animation-delay:0.05s;}
+  .kpi-card:nth-child(2){animation-delay:0.1s;}
+  .kpi-card:nth-child(3){animation-delay:0.15s;}
+  .kpi-card:nth-child(4){animation-delay:0.2s;}
+  .export-btn{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,rgba(74,222,128,0.15),rgba(56,189,248,0.1));border:1px solid rgba(74,222,128,0.4);color:var(--green);font-family:var(--mono);font-size:11px;font-weight:500;padding:6px 14px;border-radius:7px;cursor:pointer;transition:all 0.2s;letter-spacing:0.3px;white-space:nowrap;}
+  .export-btn:hover{background:linear-gradient(135deg,rgba(74,222,128,0.25),rgba(56,189,248,0.18));border-color:var(--green);box-shadow:0 0 16px rgba(74,222,128,0.2);transform:translateY(-1px);}
+  .export-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--green);color:var(--green);font-family:var(--mono);font-size:12px;padding:10px 20px;border-radius:8px;box-shadow:0 4px 24px rgba(74,222,128,0.2);z-index:9999;pointer-events:none;opacity:0;transition:opacity 0.3s;}
+  .export-toast.show{opacity:1;}
+  .corner-mark{position:fixed;bottom:16px;right:16px;font-family:var(--mono);font-size:9px;color:var(--text-dim);opacity:0.4;z-index:0;}
+  /* LOADING OVERLAY */
+  #loadingOverlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;transition:opacity 0.5s;}
+  #loadingOverlay.hide{opacity:0;pointer-events:none;}
+  .spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .loading-text{font-family:var(--mono);font-size:12px;color:var(--text-dim);letter-spacing:1px;}
+  /* ADMIN LINK BUTTON */
+  .admin-link{background:var(--surface2);border:1px solid var(--border);color:var(--text-dim);font-family:var(--mono);font-size:10px;padding:4px 10px;border-radius:6px;text-decoration:none;letter-spacing:0.3px;transition:all 0.15s;}
+  .admin-link:hover{border-color:var(--cyan);color:var(--cyan);}
+  /* ===== MOBILE RESPONSIVE ===== */
+  @media (max-width: 768px) {
+    body{font-size:12px;}
+    .header{height:auto;flex-wrap:wrap;padding:10px 14px;gap:8px;}
+    .header-left{flex-wrap:wrap;gap:8px;}
+    .logo-text{font-size:13px;}
+    .header-right{flex-wrap:wrap;gap:8px;width:100%;justify-content:flex-start;}
+    .live-pill{font-size:10px;padding:3px 8px;}
+    .header-date{font-size:10px;}
+    .admin-link{font-size:9px;padding:3px 8px;}
 
-  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:14px;margin-bottom:22px}
-  .brand{display:flex;align-items:center;gap:12px}
-  .brand .mark{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,var(--cyan),var(--violet));
-    display:flex;align-items:center;justify-content:center;font-family:'Rajdhani';font-weight:700;color:#00141A;font-size:16px;
-    box-shadow:0 0 22px rgba(0,229,255,.35)}
-  h1{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:24px;letter-spacing:.5px;margin:0;color:#fff}
-  h1 span{color:var(--cyan)}
-  .tag{font-size:11px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px}
-  .live{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace}
-  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 2s infinite}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+    .filter-bar{padding:10px 14px;gap:8px;}
+    .filter-btn{font-size:11px;padding:5px 10px;}
+    .filter-bar > div[style*="margin-left:auto"]{margin-left:0!important;width:100%;flex-wrap:wrap;}
+    .export-btn{font-size:10px;padding:6px 12px;}
 
-  .controlbar{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:18px;
-    display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end}
-  .ctl{display:flex;flex-direction:column;gap:6px;min-width:130px}
-  .ctl label{font-size:10.5px;color:var(--muted2);text-transform:uppercase;letter-spacing:.7px;font-weight:600}
-  select,input[type=text],input[type=date]{
-    background:var(--panel2);border:1px solid var(--line2);color:var(--text);border-radius:8px;
-    padding:8px 10px;font-size:13px;font-family:'Inter',sans-serif;outline:none;min-width:140px
+    main{padding:14px;}
+
+    /* All multi-column grids collapse to single column on mobile */
+    .kpi-row{grid-template-columns:1fr 1fr;gap:10px;}
+    .grid-2, .grid-3, .grid-5-7, .grid-6-4{grid-template-columns:1fr!important;}
+    .zone-grid{grid-template-columns:1fr 1fr;gap:8px;}
+    .heat-grid{grid-template-columns:repeat(2,1fr)!important;}
+
+    .kpi-card{padding:14px;}
+    .kpi-value{font-size:20px;}
+    .kpi-label{font-size:9px;}
+    .kpi-sub{font-size:10px;}
+
+    .panel-header{padding:12px 14px;}
+    .panel-title{font-size:10px;}
+    .panel-body{padding:12px 14px;}
+
+    .zone-card{padding:10px;}
+    .zone-value{font-size:16px;}
+
+    .bar-row{grid-template-columns:80px 1fr 56px;gap:6px;}
+    .bar-name{font-size:10px;}
+    .bar-amount{font-size:10px;}
+
+    /* Tables scroll horizontally instead of squeezing/clipping */
+    .scroll-body{overflow-x:auto;}
+    .data-table{min-width:520px;}
+    .data-table th, .data-table td{padding:7px 8px;font-size:11px;}
+
+    svg.spark{height:130px!important;}
+    .trend-meta, #trendMeta{flex-wrap:wrap;gap:8px!important;}
   }
-  select:focus,input:focus{border-color:var(--cyan)}
-  .tabs{display:flex;gap:4px;background:var(--panel2);padding:4px;border-radius:9px;border:1px solid var(--line2)}
-  .tab{padding:7px 14px;font-size:12.5px;font-weight:600;color:var(--muted);border-radius:6px;cursor:pointer;user-select:none;white-space:nowrap}
-  .tab.active{background:var(--cyan);color:#00212A}
-  .chk{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);cursor:pointer}
-  .spacer{flex:1}
-  .exportbtn{background:linear-gradient(135deg,var(--cyan),#00A9BF);border:none;color:#00212A;font-weight:700;
-    padding:10px 18px;border-radius:9px;font-size:13px;cursor:pointer;font-family:'Inter',sans-serif;letter-spacing:.2px}
-  .exportbtn:hover{filter:brightness(1.1)}
-  .exportbtn:disabled{opacity:.4}
 
-  .kpigrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:18px}
-  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;position:relative;overflow:hidden}
-  .kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc,var(--cyan));opacity:.7}
-  .kpi .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
-  .kpi .val{font-family:'Rajdhani',sans-serif;font-weight:700;font-size:28px;color:#fff;line-height:1}
-  .kpi .delta{font-size:12px;margin-top:8px;font-family:'JetBrains Mono',monospace}
-  .delta.up{color:var(--green)} .delta.down{color:var(--red)} .delta.flat{color:var(--muted)}
-
-  .maingrid{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;margin-bottom:16px}
-  @media(max-width:980px){.maingrid{grid-template-columns:1fr}}
-  .maingrid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px}
-  @media(max-width:1100px){.maingrid3{grid-template-columns:repeat(2,1fr)}}
-  @media(max-width:640px){.maingrid3{grid-template-columns:1fr}}
-  .bdlist{max-height:1080px;overflow-y:auto}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
-  .panel h3{font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:600;color:var(--cyan);margin:0 0 14px;
-    text-transform:uppercase;letter-spacing:.6px;display:flex;justify-content:space-between;align-items:center}
-  .panel h3 .n{color:var(--muted);font-size:11px;font-weight:500;text-transform:none;letter-spacing:0}
-  .tileExport{background:var(--panel2);border:1px solid var(--line2);color:var(--cyan);border-radius:6px;
-    padding:3px 9px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;letter-spacing:0;text-transform:none}
-  .tileExport:hover{background:var(--cyan);color:#00212A}
-
-  .lbrow{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:8px 2px;
-    border-bottom:1px solid var(--line);font-size:13px}
-  .lbrow:last-child{border-bottom:none}
-  .lbrank{color:var(--muted2);font-family:'JetBrains Mono',monospace;font-size:11px}
-  .lbname{display:flex;flex-direction:column;gap:4px;min-width:0}
-  .lbname .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
-  .lbbar{height:4px;border-radius:3px;background:var(--line2);overflow:hidden}
-  .lbbar i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--violet));border-radius:3px}
-  .lbval{font-family:'JetBrains Mono',monospace;font-size:12.5px;text-align:right;white-space:nowrap}
-  .lbval .sub{display:block;color:var(--muted);font-size:10.5px;margin-top:2px}
-
-  #trendSvg{width:100%;height:260px;display:block}
-  .trendmeta{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px;font-family:'JetBrains Mono',monospace}
-
-  .gridpanel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
-  .tablewrap{overflow-x:auto;max-height:460px;overflow-y:auto;border-radius:8px}
-  table{width:100%;border-collapse:collapse;font-size:12.5px}
-  thead th{position:sticky;top:0;background:var(--panel2);color:var(--muted);text-transform:uppercase;font-size:10.5px;
-    letter-spacing:.4px;padding:9px 10px;text-align:left;border-bottom:1px solid var(--line2);cursor:pointer;white-space:nowrap}
-  thead th:hover{color:var(--cyan)}
-  tbody td{padding:8px 10px;border-bottom:1px solid var(--line);color:var(--text)}
-  tbody tr:hover{background:rgba(0,229,255,.04)}
-  td.num,th.num{text-align:right;font-family:'JetBrains Mono',monospace}
-  .unmapped-badge{display:inline-block;background:rgba(255,176,32,.15);color:var(--amber);font-size:10px;
-    padding:1px 7px;border-radius:10px;margin-left:6px;font-weight:600}
-  .empty{text-align:center;color:var(--muted);padding:40px;font-size:13px}
-  footer{text-align:center;color:var(--muted2);font-size:11px;margin-top:30px;font-family:'JetBrains Mono',monospace}
-  *{scrollbar-width:thin;scrollbar-color:var(--line2) transparent}
-  *::-webkit-scrollbar{width:7px;height:7px}
-  *::-webkit-scrollbar-track{background:transparent}
-  *::-webkit-scrollbar-thumb{background:var(--line2);border-radius:10px}
-  *::-webkit-scrollbar-thumb:hover{background:var(--muted2)}
+  @media (max-width: 420px) {
+    .kpi-row{grid-template-columns:1fr;}
+    .zone-grid{grid-template-columns:1fr;}
+    .heat-grid{grid-template-columns:1fr 1fr!important;}
+    .kpi-value{font-size:22px;}
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="brand">
-      <div class="mark">PIL</div>
-      <div>
-        <h1>OTC SALES <span>COMMAND</span></h1>
-        <div class="tag">FY 2026–27 · North India Field Sales</div>
-      </div>
-    </div>
-    <div style="display:flex;align-items:center;gap:14px">
-      <a href="admin.html" class="exportbtn" style="text-decoration:none;display:inline-block">⇧ Upload Data</a>
-      <div class="live"><span class="dot"></span> LIVE · <span id="lastUpdate">connecting...</span></div>
-    </div>
-  </header>
+<script>
+  (function(){
+    var saved = localStorage.getItem('pil-theme');
+    var theme = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    if(theme === 'light') document.documentElement.setAttribute('data-theme','light');
+  })();
+  function toggleTheme(){
+    var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    if(isLight){
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('pil-theme','dark');
+    } else {
+      document.documentElement.setAttribute('data-theme','light');
+      localStorage.setItem('pil-theme','light');
+    }
+    var btn = document.getElementById('themeToggle');
+    if(btn) btn.textContent = isLight ? '☀ LIGHT' : '🌙 DARK';
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    var btn = document.getElementById('themeToggle');
+    if(btn) btn.textContent = document.documentElement.getAttribute('data-theme') === 'light' ? '🌙 DARK' : '☀ LIGHT';
+  });
+</script>
 
-  <div class="controlbar">
-    <div class="ctl">
-      <label>Period</label>
-      <div class="tabs" id="periodTabs">
-        <div class="tab active" data-p="month">Month</div>
-        <div class="tab" data-p="quarter">Quarter</div>
-        <div class="tab" data-p="fytd">FY to Date</div>
-        <div class="tab" data-p="custom">Custom</div>
-      </div>
-    </div>
-    <div class="ctl" id="monthPickWrap">
-      <label>Select Month</label>
-      <select id="monthPick"></select>
-    </div>
-    <div class="ctl" id="quarterPickWrap" style="display:none">
-      <label>Select Quarter</label>
-      <select id="quarterPick">
-        <option value="Q1">Q1 · Apr–Jun 2026</option>
-        <option value="Q2">Q2 · Jul–Sep 2026</option>
-        <option value="Q3">Q3 · Oct–Dec 2026</option>
-        <option value="Q4">Q4 · Jan–Mar 2027</option>
-      </select>
-    </div>
-    <div class="ctl" id="quarterMonthWrap" style="display:none">
-      <label>Month in Quarter</label>
-      <select id="quarterMonthPick">
-        <option value="ALL">All 3 Months</option>
-      </select>
-    </div>
-    <div class="ctl" id="customPickWrap" style="display:none">
-      <label>Date Range</label>
-      <div style="display:flex;gap:6px">
-        <input type="date" id="customFrom"><input type="date" id="customTo">
-      </div>
-    </div>
-
-    <div class="ctl">
-      <label>View By</label>
-      <div class="tabs" id="viewByTabs">
-        <div class="tab active" data-v="so">SO</div>
-        <div class="tab" data-v="hq">Area</div>
-        <div class="tab" data-v="st">State</div>
-        <div class="tab" data-v="pn">Product</div>
-        <div class="tab" data-v="asm">ASM</div>
-      </div>
-    </div>
-
-    <div class="ctl">
-      <label>State Filter</label>
-      <select id="stateFilter"><option value="ALL">All States</option></select>
-    </div>
-    <div class="ctl">
-      <label>Search</label>
-      <input type="text" id="searchBox" placeholder="SO / Party / Product...">
-    </div>
-    <div class="spacer"></div>
-    <button class="exportbtn" id="exportBtn" onclick="exportExcel()">⇩ Export Excel</button>
-  </div>
-
-  <div class="kpigrid" id="kpiGrid"></div>
-
-  <div class="maingrid">
-    <div class="panel">
-      <h3>Daily Net Sale Trend <span class="n" id="trendRange"></span> <button class="tileExport" onclick="exportTrendExcel()" title="Export this trend">⇩</button></h3>
-      <svg id="trendSvg" viewBox="0 0 900 260" preserveAspectRatio="none"></svg>
-      <div class="trendmeta"><span id="trendMin"></span><span id="trendMax"></span></div>
-    </div>
-    <div class="panel">
-      <h3 id="leaderboardTitle">Leaderboard · SO <button class="tileExport" onclick="exportLeaderboardExcel()" title="Export this leaderboard">⇩</button></h3>
-      <div id="leaderboard" style="max-height:280px;overflow-y:auto"></div>
-    </div>
-  </div>
-
-  <div class="maingrid3" id="breakdownGrid">
-    <div class="panel">
-      <h3>SO / HQ Wise Sales <button class="tileExport" onclick="exportSoHqExcel()" title="Export SO/HQ wise sales">⇩</button></h3>
-      <div id="bdSoHq" class="bdlist"></div>
-    </div>
-    <div class="panel">
-      <h3>Product Wise Sales <button class="tileExport" onclick="exportProductsExcel()" title="Export product wise sales">⇩</button></h3>
-      <div id="bdPn" class="bdlist"></div>
-    </div>
-    <div class="panel">
-      <h3>State Wise Sales <button class="tileExport" onclick="exportBreakdownExcel('st')" title="Export state wise sales">⇩</button></h3>
-      <div id="bdSt" class="bdlist"></div>
-    </div>
-  </div>
-
-  <footer>PIL OTC Division · Internal use only · Data source: SAP billing export</footer>
+<!-- LOADING OVERLAY -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">CONNECTING TO FIREBASE...</div>
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <div class="logo-mark">P</div>
+    <div class="logo-text">PIL <span>OTC</span> Sales Intelligence</div>
+    <div class="header-tag" id="periodTag">Q2 · 2026</div>
+  </div>
+  <div class="header-right">
+    <div class="live-pill"><div class="live-dot"></div>LIVE FIREBASE</div>
+    <div class="header-date" id="clock"></div>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">☀ LIGHT</button>
+    <a href="admin.html" class="admin-link">⚙ ADMIN</a>
+  </div>
+</header>
 
+<!-- FILTER BAR -->
+<div class="filter-bar">
+  <span class="filter-label">MONTH //</span>
+  <select id="monthSelect" onchange="switchMonth(this.value)" style="background:var(--surface2);border:1px solid var(--border);color:var(--cyan);font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:6px;cursor:pointer;outline:none">
+    <option value="live">▶ Current (Live)</option>
+  </select>
+  <span style="width:1px;height:18px;background:var(--border2);margin:0 2px"></span>
+  <span class="filter-label">VIEW BY //</span>
+  <div id="viewByPills" style="display:flex;gap:8px">
+    <button class="filter-btn active" onclick="setViewBy('zone',this)">Zone</button>
+    <button class="filter-btn" onclick="setViewBy('asm',this)">ASM</button>
+    <button class="filter-btn" onclick="setViewBy('rsm',this)">RSM</button>
+    <button class="filter-btn" onclick="setViewBy('zsm',this)">ZSM</button>
+  </div>
+  <span style="width:1px;height:18px;background:var(--border2);margin:0 2px"></span>
+  <span class="filter-label" id="pillsLabel">ZONE //</span>
+  <div id="filterPills" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+    <span class="chip" id="sapChip">Loading...</span>
+    <button class="export-btn" onclick="exportToExcel()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      EXPORT EXCEL
+    </button>
+  </div>
+</div>
+
+<div class="export-toast" id="exportToast">✓ Excel exported successfully</div>
+
+<main>
+  <!-- KPI ROW -->
+  <div class="kpi-row" id="kpiRow">
+    <div class="kpi-card cyan">
+      <div class="kpi-glow"></div>
+      <div class="kpi-label">Net Sales · Period</div>
+      <div class="kpi-value" id="kpiTotal">—</div>
+      <div class="kpi-sub" id="kpiSub1">Loading...</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-glow"></div>
+      <div class="kpi-label">Top SO Billed</div>
+      <div class="kpi-value green-text" id="kpiTopSO">—</div>
+      <div class="kpi-sub" id="kpiTopSOName">Loading...</div>
+    </div>
+    <div class="kpi-card amber">
+      <div class="kpi-glow"></div>
+      <div class="kpi-label">Top Product</div>
+      <div class="kpi-value amber-text" id="kpiTopProd">—</div>
+      <div class="kpi-sub" id="kpiTopProdName">Loading...</div>
+    </div>
+    <div class="kpi-card purple">
+      <div class="kpi-glow"></div>
+      <div class="kpi-label">Billing Days</div>
+      <div class="kpi-value" style="color:var(--purple)" id="kpiBillingDays">—</div>
+      <div class="kpi-sub" id="kpiBillingRange">Loading...</div>
+    </div>
+  </div>
+
+  <!-- ROW 1: ZONE + DAILY TREND -->
+  <div class="grid-5-7" style="margin-bottom:14px">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><div class="panel-title-dot"></div>Zone Contribution</div>
+        <div class="chip" id="zoneChip">3 Zones</div>
+      </div>
+      <div class="panel-body">
+        <div class="zone-grid" id="zoneGrid">
+          <div class="zone-card"><div class="zone-name">Loading...</div></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:20px;margin-top:18px">
+          <svg id="donutSvg" width="100" height="100" viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="38" fill="none" stroke="var(--surface2)" stroke-width="12"/>
+            <text x="50" y="54" text-anchor="middle" fill="var(--text-dim)" font-size="8" font-family="JetBrains Mono">Loading</text>
+          </svg>
+          <div class="ring-legend" id="ringLegend"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><div class="panel-title-dot" style="background:var(--amber)"></div>Daily Billing Trend</div>
+        <div class="chip" id="dailyChip">— Days</div>
+      </div>
+      <div class="panel-body">
+        <svg class="spark" id="trendSvg" viewBox="0 0 600 140" style="height:150px">
+          <text x="300" y="70" text-anchor="middle" fill="var(--text-dim)" font-size="12" font-family="JetBrains Mono">Loading trend data...</text>
+        </svg>
+        <div style="display:flex;gap:16px;margin-top:8px;font-size:10px;font-family:var(--mono);color:var(--text-dim)" id="trendMeta"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 2: SO PERFORMANCE + STATE BREAKDOWN -->
+  <div class="grid-6-4" style="margin-bottom:14px">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><div class="panel-title-dot" style="background:var(--green)"></div>SO-wise Net Sales</div>
+        <div class="chip" id="soChip">— SOs</div>
+      </div>
+      <div class="panel-body">
+        <div class="bar-chart" id="soBarChart"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><div class="panel-title-dot" style="background:var(--purple)"></div>State Breakdown</div>
+      </div>
+      <div class="panel-body">
+        <div class="bar-chart" id="stateBarChart"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3: PRODUCT HEATMAP -->
+  <div class="panel" style="margin-bottom:14px">
+    <div class="panel-header">
+      <div class="panel-title"><div class="panel-title-dot" style="background:var(--amber)"></div>Product Revenue Heatmap · Top 15</div>
+      <div class="chip" id="skuChip">— SKUs</div>
+    </div>
+    <div class="panel-body">
+      <div class="heat-grid" id="heatGrid"></div>
+    </div>
+  </div>
+
+  <!-- ROW 4: CUSTOMER TABLE -->
+  <div class="panel" style="margin-bottom:14px">
+    <div class="panel-header">
+      <div class="panel-title"><div class="panel-title-dot" style="background:var(--purple)"></div>Stockist Performance</div>
+      <div class="chip" id="stockistChip">— Stockists</div>
+    </div>
+    <div class="scroll-body">
+      <table class="data-table" id="custTable">
+        <thead>
+          <tr>
+            <th>#</th><th>STOCKIST NAME</th><th>SO</th><th>ZONE</th><th>NET AMOUNT</th><th>SHARE</th>
+          </tr>
+        </thead>
+        <tbody id="custTbody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<div class="corner-mark">PIL OTC · Sales Intelligence v2.0 · Firebase Live</div>
+
+<!-- FIREBASE SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
 const firebaseConfig = {
   apiKey: "AIzaSyBnsCYzc2J_NfBEpRzEq0-PDKrGuCnTGFw",
   authDomain: "otc-dashboard-4c418.firebaseapp.com",
@@ -231,496 +418,475 @@ const firebaseConfig = {
   messagingSenderId: "45401311739",
   appId: "1:45401311739:web:53e4b7a57a5b8800d6235e"
 };
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
 
-const VIEW_LABELS = {so:'SO', hq:'Area (HQ)', st:'State', pn:'Product', asm:'ASM'};
-const QUARTERS = {
-  Q1:['2026-04','2026-05','2026-06'], Q2:['2026-07','2026-08','2026-09'],
-  Q3:['2026-10','2026-11','2026-12'], Q4:['2027-01','2027-02','2027-03']
-};
-const FY_MONTHS = [...QUARTERS.Q1,...QUARTERS.Q2,...QUARTERS.Q3,...QUARTERS.Q4];
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-let monthsMeta = {};       // key -> {rowCount, netTotal, importedAt}
-let MASTER = { products:{}, parties:{}, team:{} };
-let ALL_SO_HQ = [];   // [{so, hq}]
-let ALL_PRODUCTS = []; // [{code, name}]
+// ===== GLOBAL STATE =====
+let soData = [], productData = [], custData = [], dailyData = [], meta = {};
+let currentZone = 'All';          // kept for export filename compatibility
+let currentViewBy = 'zone';       // 'zone' | 'rsm' | 'zsm'
+let currentFilterValue = 'All';
+const zoneColors = {"Delhi/NCR":"var(--green)","Rajasthan":"var(--amber)","West UP & UK":"var(--cyan)"};
 
-async function loadMaster(){
-  const snap = await get(ref(db,'master'));
-  if(!snap.exists()) return;
-  MASTER = snap.val();
-  MASTER.parties = MASTER.parties || {};
-  MASTER.products = MASTER.products || {};
-  const soMap = {};
-  Object.values(MASTER.parties).forEach(p=>{
-    const so = (p.so || 'UNMAPPED').toString().trim();
-    if(so === 'UNMAPPED') return;
-    if(!soMap[so]) soMap[so] = p.hq || '';
-  });
-  ALL_SO_HQ = Object.entries(soMap).map(([so,hq])=>({so,hq})).sort((a,b)=>a.so.localeCompare(b.so));
-  ALL_PRODUCTS = Object.entries(MASTER.products).map(([code,p])=>({code, name:p.name||code})).sort((a,b)=>a.name.localeCompare(b.name));
-}
+// ===== MONTH SWITCHER =====
+let _liveListeners = true;   // true = live Firebase listeners active
 
-let cache = {};            // key -> array of records
-let state = {
-  period:'month', month:null, quarter:'Q1', quarterMonth:'ALL', customFrom:null, customTo:null,
-  viewBy:'so', stateFilter:'ALL', search:''
-};
-let currentRows = [];
-
-async function loadMonthsMeta(){
-  const snap = await get(ref(db,'months'));
-  monthsMeta = {};
-  if(snap.exists()){
-    const val = snap.val();
-    Object.keys(val).forEach(k=>{ monthsMeta[k] = val[k].meta || {}; });
-  }
-  const monthSel = document.getElementById('monthPick');
-  monthSel.innerHTML='';
-  Object.keys(monthsMeta).sort().forEach(k=>{
-    const opt = document.createElement('option'); opt.value=k; opt.textContent = monthLabel(k);
-    monthSel.appendChild(opt);
-  });
-  const keys = Object.keys(monthsMeta).sort();
-  state.month = keys.length ? keys[keys.length-1] : null;
-  if(state.month) monthSel.value = state.month;
-  document.getElementById('lastUpdate').textContent = new Date().toLocaleString('en-IN');
-}
-
-function monthLabel(k){
-  const [y,m] = k.split('-').map(Number);
-  return new Date(y,m-1,1).toLocaleString('en-IN',{month:'long',year:'numeric'});
-}
-
-async function ensureMonths(keys){
-  const need = keys.filter(k=>monthsMeta[k] && !cache[k]);
-  await Promise.all(need.map(async k=>{
-    const snap = await get(ref(db,`months/${k}/records`));
-    cache[k] = snap.exists() ? Object.values(snap.val()) : [];
-  }));
-}
-
-function periodKeys(){
-  if(state.period==='month') return state.month ? [state.month] : [];
-  if(state.period==='quarter'){
-    const months = QUARTERS[state.quarter].filter(k=>monthsMeta[k]);
-    if(state.quarterMonth && state.quarterMonth!=='ALL') return months.filter(k=>k===state.quarterMonth);
-    return months;
-  }
-  if(state.period==='fytd') return FY_MONTHS.filter(k=>monthsMeta[k]);
-  if(state.period==='custom') {
-    if(!state.customFrom || !state.customTo) return Object.keys(monthsMeta);
-    return Object.keys(monthsMeta).filter(k=>{
-      return k >= state.customFrom.slice(0,7) && k <= state.customTo.slice(0,7);
+async function loadArchiveOptions() {
+  try {
+    const snap = await db.ref('/archive').once('value');
+    const d = snap.val();
+    if (!d) return;
+    const sel = document.getElementById('monthSelect');
+    Object.keys(d).sort((a,b)=>b.localeCompare(a)).forEach(k => {
+      const opt = document.createElement('option');
+      opt.value = k;
+      const tot = d[k].so_data ? Object.values(d[k].so_data).reduce((s,r)=>s+(r.amt||0),0) : 0;
+      opt.textContent = `${k}  (₹${(tot/100000).toFixed(2)}L)`;
+      sel.appendChild(opt);
     });
-  }
-  return [];
+  } catch(e) { console.warn('Archive options load failed:', e); }
 }
+loadArchiveOptions();
 
-function prevPeriodKeys(){
-  if(state.period==='month' && state.month){
-    const idx = FY_MONTHS.indexOf(state.month);
-    if(idx>0 && monthsMeta[FY_MONTHS[idx-1]]) return [FY_MONTHS[idx-1]];
-    return [];
-  }
-  if(state.period==='quarter'){
-    const qOrder=['Q1','Q2','Q3','Q4']; const idx = qOrder.indexOf(state.quarter);
-    if(idx>0){ const ks = QUARTERS[qOrder[idx-1]].filter(k=>monthsMeta[k]); return ks.length===3?ks:[]; }
-    return [];
-  }
-  return [];
-}
-
-async function refresh(){
-  const keys = periodKeys();
-  await ensureMonths(keys);
-  let rows = [];
-  keys.forEach(k=> rows = rows.concat(cache[k]||[]));
-
-  // custom date range: trim to exact days
-  if(state.period==='custom' && state.customFrom && state.customTo){
-    rows = rows.filter(r=> r.d >= state.customFrom && r.d <= state.customTo);
-  }
-
-  // populate state filter options (from full period, before filtering by state itself)
-  const stSel = document.getElementById('stateFilter');
-  const states = [...new Set(rows.map(r=>r.st))].sort();
-  const curVal = state.stateFilter;
-  stSel.innerHTML = '<option value="ALL">All States</option>' + states.map(s=>`<option value="${s}">${s}</option>`).join('');
-  stSel.value = states.includes(curVal) ? curVal : 'ALL';
-  state.stateFilter = stSel.value;
-
-  let filtered = rows.filter(r=>{
-    if(!r.mapped) return false;
-    if(state.stateFilter!=='ALL' && r.st!==state.stateFilter) return false;
-    if(state.search){
-      const s = state.search.toLowerCase();
-      if(!(r.so.toLowerCase().includes(s) || r.cn.toLowerCase().includes(s) || r.pn.toLowerCase().includes(s) || r.hq.toLowerCase().includes(s))) return false;
+window.switchMonth = async function(monthKey) {
+  if (monthKey === 'live') {
+    // Re-attach live listeners if they were detached
+    if (!_liveListeners) {
+      _liveListeners = true;
+      Object.values(_loaded).forEach((_,i,a)=>a[i]=false);
+      _firstLoadDone = false;
+      _watch('so_data',      v => soData      = v ? Object.values(v) : []);
+      _watch('product_data', v => productData = v ? Object.values(v) : []);
+      _watch('cust_data',    v => custData    = v ? Object.values(v) : []);
+      _watch('daily_data',   v => dailyData   = v ? Object.values(v) : []);
+      _watch('meta',         v => meta        = v || {});
     }
-    return true;
-  });
+    return;
+  }
+  // Switch to an archived month — detach live listeners first
+  if (_liveListeners) {
+    db.ref('/so_data').off();
+    db.ref('/product_data').off();
+    db.ref('/cust_data').off();
+    db.ref('/daily_data').off();
+    db.ref('/meta').off();
+    _liveListeners = false;
+  }
+  try {
+    const snap = await db.ref('/archive/'+monthKey).once('value');
+    const d = snap.val() || {};
+    soData      = d.so_data      ? Object.values(d.so_data)      : [];
+    productData = d.product_data ? Object.values(d.product_data) : [];
+    custData    = d.cust_data    ? Object.values(d.cust_data)    : [];
+    dailyData   = d.daily_data   ? Object.values(d.daily_data)   : [];
+    meta        = d.meta         || {};
+    renderAll();
+  } catch(e) { console.error('Archive load failed:', e); }
+};
 
-  currentRows = filtered;
-  const safe = (fn,label) => { try{ fn(); }catch(e){ console.error('Render failed:',label,e); } };
-  safe(()=>renderKPIs(filtered),'KPIs');
-  safe(()=>renderTrend(filtered),'Trend');
-  safe(()=>renderLeaderboard(filtered),'Leaderboard');
-  safe(()=>renderBreakdowns(filtered),'Breakdowns');
+// ===== FIREBASE LISTENERS (live / current month) =====
+// Per-node listeners — required because current security rules grant .read at
+// individual node paths (so_data, product_data, etc.), not at root. A single
+// db.ref('/').on(...) listener fails with permission_denied under those rules.
+const _loaded = { so_data:false, product_data:false, cust_data:false, daily_data:false, meta:false };
+let _firstLoadDone = false;
+function _onNodeUpdate() {
+  if (!Object.values(_loaded).every(Boolean)) return;
+  if (!_firstLoadDone && soData.length === 0 && custData.length === 0) {
+    showError();
+    return;
+  }
+  renderAll();
+  if (!_firstLoadDone) { hideLoading(); _firstLoadDone = true; }
+}
+function _watch(node, assign) {
+  db.ref('/'+node).on('value', snap => {
+    assign(snap.val());
+    _loaded[node] = true;
+    _onNodeUpdate();
+  }, err => { console.error(node, err); showError(); });
+}
+_watch('so_data',      v => soData      = v ? Object.values(v) : []);
+_watch('product_data', v => productData = v ? Object.values(v) : []);
+_watch('cust_data',    v => custData    = v ? Object.values(v) : []);
+_watch('daily_data',   v => dailyData   = v ? Object.values(v) : []);
+_watch('meta',         v => meta        = v || {});
+
+function hideLoading() {
+  const ol = document.getElementById('loadingOverlay');
+  ol.classList.add('hide');
+  setTimeout(() => ol.style.display = 'none', 600);
 }
 
-function fmtINR(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
+function showError() {
+  document.querySelector('.loading-text').textContent = 'NO DATA FOUND — OPEN ADMIN.HTML TO ADD DATA';
+  document.querySelector('.loading-text').style.color = 'var(--red)';
+}
 
-function renderKPIs(rows){
-  const net = rows.reduce((a,r)=>a+r.na,0);
-  const qty = rows.reduce((a,r)=>a+r.q,0);
-  const soSet = new Set(rows.map(r=>r.so));
-  const partySet = new Set(rows.map(r=>r.cc));
-  const productSet = new Set(rows.map(r=>r.pn));
+// ===== RENDER ALL =====
+function renderAll() {
+  const totalAmt = soData.reduce((s, d) => s + d.amt, 0);
+  const topSO = [...soData].sort((a,b) => b.amt - a.amt)[0] || {};
+  const topProd = [...productData].sort((a,b) => b.amt - a.amt)[0] || {};
 
-  let deltaHtml = '';
-  const prevKeys = prevPeriodKeys();
-  if(prevKeys.length){
-    const prevRows = prevKeys.flatMap(k=>cache[k]||[]);
-    const prevNet = prevRows.filter(r=> r.mapped && (state.stateFilter==='ALL'||r.st===state.stateFilter)).reduce((a,r)=>a+r.na,0);
-    if(prevNet>0){
-      const pct = ((net-prevNet)/prevNet*100);
-      const cls = pct>0.5?'up':pct<-0.5?'down':'flat';
-      const arrow = pct>0.5?'▲':pct<-0.5?'▼':'●';
-      deltaHtml = `<div class="delta ${cls}">${arrow} ${Math.abs(pct).toFixed(1)}% vs prev period</div>`;
-    }
+  // KPIs
+  document.getElementById('kpiSub1').textContent = `${custData.length} stockists · ${soData.length} SOs`;
+  document.getElementById('kpiTopSO').textContent = `₹${((topSO.amt||0)/100000).toFixed(2)}L`;
+  document.getElementById('kpiTopSOName').textContent = `${topSO.name||'—'} · ${topSO.zone||''}`;
+  document.getElementById('kpiTopProd').textContent = `₹${((topProd.amt||0)/1000).toFixed(1)}K`;
+  document.getElementById('kpiTopProdName').textContent = topProd.name||'—';
+  document.getElementById('kpiBillingDays').textContent = dailyData.length || meta.billing_days || '—';
+  document.getElementById('kpiBillingRange').textContent = meta.period || '';
+  document.getElementById('sapChip').textContent = meta.sap_info || `${soData.length} SOs · ₹${(totalAmt/100000).toFixed(2)}L`;
+  document.getElementById('periodTag').textContent = meta.period_tag || 'LIVE';
+  document.getElementById('soChip').textContent = `${soData.length} SOs`;
+  document.getElementById('stockistChip').textContent = `${custData.length} Stockists`;
+  document.getElementById('skuChip').textContent = `${productData.length} SKUs`;
+
+  // Zone summary
+  renderZones(totalAmt);
+  renderDailyTrend();
+  rebuildFilterPills();
+  renderSOBars(currentFilterValue);
+  renderStateBreakdown();
+  renderHeatmap();
+  renderCustTable(currentFilterValue);
+  updateKpiTotal();
+}
+
+// ===== HIERARCHY LOOKUP (SO name → RSM/ZSM, set by admin.html's Team List mapping) =====
+function soHierarchyMap() {
+  const map = {};
+  soData.forEach(d => { map[d.name] = { rsm: d.rsm||'', zsm: d.zsm||'', asm: d.asm||'' }; });
+  return map;
+}
+
+// Grouping value for a record under the current View By dimension.
+// SO records carry rsm/zsm directly (written by admin.html on upload).
+// Stockist records don't — they're matched to their SO's hierarchy via the "so" name field.
+function groupValue(record, isStockist) {
+  if (currentViewBy === 'zone') return record.zone || 'Other';
+  if (isStockist) {
+    const h = soHierarchyMap()[record.so];
+    return (h && h[currentViewBy]) || 'Unassigned';
+  }
+  return record[currentViewBy] || 'Unassigned';
+}
+
+// ===== VIEW BY (Zone / RSM / ZSM) =====
+window.setViewBy = function(viewBy, btn) {
+  currentViewBy = viewBy;
+  currentFilterValue = 'All';
+  document.querySelectorAll('#viewByPills .filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  rebuildFilterPills();
+  renderSOBars('All');
+  renderCustTable('All');
+  updateKpiTotal();
+};
+
+function rebuildFilterPills() {
+  document.getElementById('pillsLabel').textContent = currentViewBy.toUpperCase() + ' //';
+  const values = [...new Set(soData.map(d => d[currentViewBy] || 'Unassigned'))].sort();
+  if (!values.includes(currentFilterValue)) currentFilterValue = 'All';
+  const wrap = document.getElementById('filterPills');
+  const esc = v => String(v).replace(/'/g, "\\'");
+  wrap.innerHTML = `<button class="filter-btn${currentFilterValue==='All'?' active':''}" onclick="filterPill('All',this)">All</button>` +
+    values.map(v => `<button class="filter-btn${v===currentFilterValue?' active':''}" onclick="filterPill('${esc(v)}',this)">${v}</button>`).join('');
+}
+
+window.filterPill = function(value, btn) {
+  currentFilterValue = value;
+  currentZone = value; // kept in sync for export filename
+  document.querySelectorAll('#filterPills .filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderSOBars(value);
+  renderCustTable(value);
+  updateKpiTotal();
+};
+
+function updateKpiTotal() {
+  const filtered = currentFilterValue === 'All' ? soData : soData.filter(d => groupValue(d,false) === currentFilterValue);
+  const t = filtered.reduce((s,d) => s + d.amt, 0);
+  document.getElementById('kpiTotal').textContent = `₹${(t/100000).toFixed(2)}L`;
+}
+
+// ===== ZONE CONTRIBUTION =====
+function renderZones(totalAmt) {
+  const zones = {};
+  soData.forEach(d => {
+    zones[d.zone] = (zones[d.zone]||0) + d.amt;
+  });
+
+  const zoneList = Object.entries(zones).sort((a,b) => b[1] - a[1]);
+  const zoneColors2 = {"Delhi/NCR":"var(--green)","Rajasthan":"var(--amber)","West UP & UK":"var(--cyan)"};
+
+  const grid = document.getElementById('zoneGrid');
+  grid.innerHTML = '';
+  zoneList.forEach(([zone, amt]) => {
+    const pct = (amt / totalAmt * 100).toFixed(1);
+    const color = zoneColors2[zone] || 'var(--cyan)';
+    const div = document.createElement('div');
+    div.className = 'zone-card';
+    div.innerHTML = `
+      <div class="zone-name">${zone}</div>
+      <div class="zone-value" style="color:${color}">₹${(amt/100000).toFixed(2)}L</div>
+      <div class="zone-pct" style="color:${color}">${pct}%</div>
+      <div class="zone-bar"><div class="zone-bar-fill" style="width:${pct}%;background:${color}"></div></div>`;
+    grid.appendChild(div);
+  });
+  document.getElementById('zoneChip').textContent = `${zoneList.length} Zones`;
+
+  // Donut
+  const circ = 2 * Math.PI * 38;
+  const colors = ["var(--green)","var(--amber)","var(--cyan)","var(--purple)","var(--red)"];
+  let offset = 0;
+  let donutPaths = '<circle cx="50" cy="50" r="38" fill="none" stroke="var(--surface2)" stroke-width="12"/>';
+  const totalZ = zoneList.reduce((s,[,a]) => s+a, 0);
+  zoneList.forEach(([zone, amt], i) => {
+    const frac = amt / totalZ;
+    const dash = frac * circ;
+    const gap = circ - dash;
+    const startOffset = -(offset * circ / totalZ) * 1 + (circ * 0.25);
+    donutPaths += `<circle cx="50" cy="50" r="38" fill="none" stroke="${colors[i]}" stroke-width="12"
+      stroke-dasharray="${(frac*circ).toFixed(2)} ${circ.toFixed(2)}"
+      stroke-dashoffset="${(circ * 0.25 - offset * circ).toFixed(2)}" stroke-linecap="round"/>`;
+    offset += frac;
+  });
+  donutPaths += `<text x="50" y="47" text-anchor="middle" fill="var(--text)" font-size="11" font-weight="600" font-family="JetBrains Mono">${(totalAmt/100000).toFixed(1)}</text>
+    <text x="50" y="60" text-anchor="middle" fill="var(--text-dim)" font-size="8" font-family="JetBrains Mono">LAKHS</text>`;
+  document.getElementById('donutSvg').innerHTML = donutPaths;
+
+  // Legend
+  const legend = document.getElementById('ringLegend');
+  legend.innerHTML = '';
+  zoneList.forEach(([zone, amt], i) => {
+    const pct = (amt / totalAmt * 100).toFixed(1);
+    const div = document.createElement('div');
+    div.className = 'ring-item';
+    div.innerHTML = `<div class="ring-dot" style="background:${colors[i]}"></div>
+      <div class="ring-item-label">${zone}</div>
+      <div class="ring-item-val">${pct}%</div>`;
+    legend.appendChild(div);
+  });
+}
+
+// ===== DAILY TREND =====
+function renderDailyTrend() {
+  if (!dailyData.length) {
+    document.getElementById('trendSvg').innerHTML = '<text x="300" y="70" text-anchor="middle" fill="var(--text-dim)" font-size="12" font-family="JetBrains Mono">No daily data yet</text>';
+    return;
+  }
+  const sorted = [...dailyData].sort((a,b) => new Date(a.date) - new Date(b.date));
+  const amts = sorted.map(d => d.amt);
+  const maxA = Math.max(...amts), minA = Math.min(...amts);
+  const range = maxA - minA || 1;
+  const n = sorted.length;
+  const W = 600, H = 130, padX = 27, padY = 20;
+  const xStep = n > 1 ? (W - padX*2) / (n-1) : 0;
+
+  const pts = sorted.map((d, i) => {
+    const x = padX + i * xStep;
+    const y = padY + (1 - (d.amt - minA) / range) * (H - padY*2);
+    return {x, y, d};
+  });
+
+  let svg = `<defs>
+    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="var(--cyan)" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="var(--cyan)" stop-opacity="0"/>
+    </linearGradient></defs>
+    <line x1="0" y1="30" x2="${W}" y2="30" stroke="var(--border2)" stroke-width="1"/>
+    <line x1="0" y1="70" x2="${W}" y2="70" stroke="var(--border2)" stroke-width="1"/>
+    <line x1="0" y1="110" x2="${W}" y2="110" stroke="var(--border2)" stroke-width="1"/>`;
+
+  const areaPath = pts.map((p,i) => `${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+    + ` L${pts[pts.length-1].x},${H} L${pts[0].x},${H} Z`;
+  svg += `<path d="${areaPath}" fill="url(#areaGrad)"/>`;
+
+  const linePath = pts.map((p,i) => `${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  svg += `<polyline points="${pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}" fill="none" stroke="var(--cyan)" stroke-width="2" stroke-linejoin="round"/>`;
+
+  let peakIdx = amts.indexOf(maxA), dipIdx = amts.indexOf(minA);
+  pts.forEach((p, i) => {
+    const isEdge = i === peakIdx || i === dipIdx;
+    const color = i === peakIdx ? 'var(--amber)' : i === dipIdx ? 'var(--red)' : 'var(--cyan)';
+    svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isEdge?4.5:3.5}" fill="${color}" ${isEdge?'stroke="var(--bg)" stroke-width="1.5"':''}/>`;
+    // Date label — format is "08-Jun-2026", show "08-Jun" (day-month), not the year
+    const dateParts = sorted[i].date ? String(sorted[i].date).split('-') : null;
+    const label = dateParts && dateParts.length >= 2 ? `${dateParts[0]}-${dateParts[1]}` : (i+1);
+    svg += `<text x="${p.x.toFixed(1)}" y="${H+12}" text-anchor="middle" fill="${isEdge?color:'var(--text-dim)'}" font-size="7.5" font-family="JetBrains Mono">${label}</text>`;
+  });
+
+  // Peak/dip labels
+  if (peakIdx >= 0) {
+    const p = pts[peakIdx];
+    svg += `<text x="${p.x.toFixed(1)}" y="${(p.y-8).toFixed(1)}" text-anchor="middle" fill="var(--amber)" font-size="8" font-family="JetBrains Mono">₹${(maxA/100000).toFixed(2)}L</text>`;
   }
 
-  const grid = document.getElementById('kpiGrid');
-  grid.innerHTML = `
-    <div class="kpi" style="--kc:var(--cyan)"><div class="lbl">Net Sale</div><div class="val">${fmtINR(net)}</div>${deltaHtml}</div>
-    <div class="kpi" style="--kc:var(--violet)"><div class="lbl">Quantity Sold</div><div class="val">${qty.toLocaleString('en-IN')}</div></div>
-    <div class="kpi" style="--kc:var(--green)"><div class="lbl">Active SOs</div><div class="val">${soSet.size}</div></div>
-    <div class="kpi" style="--kc:var(--amber)"><div class="lbl">Active Parties</div><div class="val">${partySet.size}</div></div>
-    <div class="kpi" style="--kc:var(--red)"><div class="lbl">Unique Products</div><div class="val" style="font-size:20px">${productSet.size}</div></div>
-  `;
+  document.getElementById('trendSvg').innerHTML = svg;
+  document.getElementById('dailyChip').textContent = `${sorted.length} Days`;
+
+  const avg = amts.reduce((s,a)=>s+a,0)/amts.length;
+  document.getElementById('trendMeta').innerHTML = `
+    <span><span style="color:var(--amber)">●</span> Peak: ₹${(maxA/1000).toFixed(1)}K</span>
+    <span><span style="color:var(--red)">●</span> Dip: ₹${(minA/1000).toFixed(1)}K</span>
+    <span style="margin-left:auto;color:var(--text)">Avg/Day: ₹${(avg/1000).toFixed(1)}K</span>`;
 }
 
-function renderTrend(rows){
-  const byDay = {};
-  rows.forEach(r=>{ byDay[r.d]=(byDay[r.d]||0)+r.na; });
-  const days = Object.keys(byDay).sort();
-  const svg = document.getElementById('trendSvg');
-  document.getElementById('trendRange').textContent = days.length ? `${days[0]} → ${days[days.length-1]}` : '';
-  if(!days.length){ svg.innerHTML=''; document.getElementById('trendMin').textContent=''; document.getElementById('trendMax').textContent=''; return; }
-
-  // Bucket days into calendar weeks (7-day blocks starting from the first day in range)
-  const first = new Date(days[0]);
-  const weeks = [];
-  days.forEach(d=>{
-    const diffDays = Math.floor((new Date(d) - first) / 86400000);
-    const wIdx = Math.floor(diffDays / 7);
-    weeks[wIdx] = weeks[wIdx] || { days: [], net: 0 };
-    weeks[wIdx].days.push(d);
-    weeks[wIdx].net += byDay[d];
+// ===== SO BARS =====
+function renderSOBars(value) {
+  const container = document.getElementById('soBarChart');
+  const filtered = value === 'All' ? soData : soData.filter(d => groupValue(d,false) === value);
+  const sorted = [...filtered].sort((a,b) => b.amt - a.amt);
+  const maxAmt = sorted[0]?.amt || 1;
+  container.innerHTML = '';
+  sorted.forEach(d => {
+    const pct = (d.amt / maxAmt * 100).toFixed(1);
+    const color = zoneColors[d.zone] || 'var(--cyan)'; // always color by zone for visual consistency
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+    row.innerHTML = `
+      <div class="bar-name">${d.name}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:0%;background:${color}"></div></div>
+      <div class="bar-amount" style="color:${color}">₹${(d.amt/1000).toFixed(1)}K</div>`;
+    container.appendChild(row);
+    setTimeout(() => row.querySelector('.bar-fill').style.width = pct + '%', 100);
   });
-  const weekList = weeks.map((w,i)=> w ? {idx:i, ...w} : null).filter(Boolean);
+}
 
-  const vals = weekList.map(w=>w.net);
-  const max = Math.max(...vals), min = Math.min(...vals,0);
-  const W=900,H=230,padTop=10,padBottom=6,labelH=34,padSide=30;
-  const n = weekList.length;
-  const pts = weekList.map((w,i)=>{
-    const x = padSide + (n>1 ? (i/(n-1))*(W-2*padSide) : (W-2*padSide)/2);
-    const y = H-padBottom - ((w.net-min)/((max-min)||1))*(H-padTop-padBottom);
-    return [x,y];
+// ===== STATE BREAKDOWN =====
+function renderStateBreakdown() {
+  const states = {};
+  custData.forEach(d => {
+    const state = d.state || guessState(d.zone);
+    states[state] = (states[state]||0) + d.amt;
   });
-  const linePath = pts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-  const areaPath = linePath + ` L${pts[pts.length-1][0].toFixed(1)},${H-padBottom} L${pts[0][0].toFixed(1)},${H-padBottom} Z`;
-  const shortDate = d => { const [y,m,dd] = d.split('-'); return `${dd}/${m}`; };
-  const labels = weekList.map((w,i)=>{
-    const range = `${shortDate(w.days[0])}–${shortDate(w.days[w.days.length-1])}`;
-    return `<text x="${pts[i][0].toFixed(1)}" y="${H+16}" font-size="10.5" font-weight="600" fill="#EAEEF5" text-anchor="middle" font-family="JetBrains Mono, monospace">Week ${w.idx+1}</text>
-            <text x="${pts[i][0].toFixed(1)}" y="${H+29}" font-size="9.5" fill="#71809A" text-anchor="middle" font-family="JetBrains Mono, monospace">${range}</text>`;
-  }).join('');
-  svg.innerHTML = `
-    <defs>
-      <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="#00E5FF" stop-opacity="0.35"/>
-        <stop offset="100%" stop-color="#00E5FF" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-    <path d="${areaPath}" fill="url(#areaGrad)"/>
-    <path d="${linePath}" fill="none" stroke="#00E5FF" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"
-      style="filter:drop-shadow(0 0 6px rgba(0,229,255,.6))"/>
-    ${pts.map((p,i)=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="#00E5FF" opacity="0.9"><title>Week ${weekList[i].idx+1}: ${fmtINR(weekList[i].net)}</title></circle>`).join('')}
-    ${labels}
-  `;
-  document.getElementById('trendMin').textContent = 'Low: ' + fmtINR(min<0?0:min);
-  document.getElementById('trendMax').textContent = 'Peak: ' + fmtINR(max);
-}
-
-function renderLeaderboard(rows){
-  const key = state.viewBy;
-  document.getElementById('leaderboardTitle').textContent = 'Leaderboard · ' + VIEW_LABELS[key];
-  const agg = {};
-  rows.forEach(r=>{
-    const k = r[key] || 'UNKNOWN';
-    agg[k] = agg[k] || {net:0, qty:0};
-    agg[k].net += r.na; agg[k].qty += r.q;
+  const sorted = Object.entries(states).sort((a,b) => b[1]-a[1]);
+  const maxAmt = sorted[0]?.[1] || 1;
+  const stateColors = {'HARYANA':'var(--green)','RAJASTHAN':'var(--amber)','DELHI':'var(--purple)','UTTAR PRADESH':'var(--cyan)','PUNJAB':'var(--red)'};
+  const container = document.getElementById('stateBarChart');
+  container.innerHTML = '';
+  sorted.forEach(([state, amt]) => {
+    const pct = (amt / maxAmt * 100).toFixed(1);
+    const color = stateColors[state.toUpperCase()] || 'var(--text-mid)';
+    const row = document.createElement('div');
+    row.className = 'bar-row';
+    row.innerHTML = `
+      <div class="bar-name">${state.toUpperCase()}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:0%;background:${color}"></div></div>
+      <div class="bar-amount" style="color:${color}">₹${(amt/100000).toFixed(2)}L</div>`;
+    container.appendChild(row);
+    setTimeout(() => row.querySelector('.bar-fill').style.width = pct + '%', 100);
   });
-  const entries = Object.entries(agg).sort((a,b)=>b[1].net-a[1].net);
-  const max = entries.length ? entries[0][1].net : 1;
-  const box = document.getElementById('leaderboard');
-  if(!entries.length){ box.innerHTML='<div class="empty">No data for this selection.</div>'; return; }
-  box.innerHTML = entries.slice(0,50).map(([name,v],i)=>`
-    <div class="lbrow">
-      <div class="lbrank">${String(i+1).padStart(2,'0')}</div>
-      <div class="lbname">
-        <span class="n">${name}</span>
-        <div class="lbbar"><i style="width:${Math.max(2,100*v.net/max)}%"></i></div>
-      </div>
-      <div class="lbval">${fmtINR(v.net)}<span class="sub">${v.qty.toLocaleString('en-IN')} units</span></div>
-    </div>
-  `).join('');
 }
 
-function aggBy(rows, key){
-  const agg = {};
-  rows.forEach(r=>{
-    const k = r[key] || 'UNKNOWN';
-    agg[k] = agg[k] || {net:0, qty:0};
-    agg[k].net += r.na; agg[k].qty += r.q;
+function guessState(zone) {
+  const map = {'Delhi/NCR':'Haryana','Rajasthan':'Rajasthan','West UP & UK':'Uttar Pradesh'};
+  return map[zone] || zone || 'Other';
+}
+
+// ===== HEATMAP =====
+function renderHeatmap() {
+  const grid = document.getElementById('heatGrid');
+  const top15 = [...productData].sort((a,b)=>b.amt-a.amt).slice(0,15);
+  const max = top15[0]?.amt || 1;
+  grid.innerHTML = '';
+  top15.forEach((p, i) => {
+    const ratio = p.amt / max;
+    const alpha = 0.12 + ratio * 0.5;
+    const palettes = [
+      [`rgba(56,189,248,${alpha})`,'var(--cyan)'],
+      [`rgba(74,222,128,${alpha})`,'var(--green)'],
+      [`rgba(251,191,36,${alpha})`,'var(--amber)'],
+      [`rgba(167,139,250,${alpha})`,'var(--purple)'],
+      [`rgba(248,113,113,${alpha})`,'var(--red)'],
+    ];
+    const [bg, border] = palettes[Math.floor(i/3) % 5];
+    const cell = document.createElement('div');
+    cell.className = 'heat-cell';
+    cell.style.background = bg;
+    cell.style.border = `1px solid ${border}`;
+    cell.innerHTML = `<div class="heat-cell-name">${p.name}</div><div class="heat-cell-val">₹${(p.amt/1000).toFixed(1)}K</div>`;
+    grid.appendChild(cell);
   });
-  return Object.entries(agg).sort((a,b)=>b[1].net-a[1].net);
 }
 
-function renderBdPanel(elId, rows, key){
-  const entries = aggBy(rows, key);
-  const max = entries.length ? entries[0][1].net : 1;
-  const box = document.getElementById(elId);
-  if(!entries.length){ box.innerHTML='<div class="empty">No data for this selection.</div>'; return; }
-  box.innerHTML = entries.slice(0,50).map(([name,v],i)=>`
-    <div class="lbrow">
-      <div class="lbrank">${String(i+1).padStart(2,'0')}</div>
-      <div class="lbname">
-        <span class="n">${name}</span>
-        <div class="lbbar"><i style="width:${Math.max(2,100*v.net/max)}%"></i></div>
-      </div>
-      <div class="lbval">${fmtINR(v.net)}<span class="sub">${v.qty.toLocaleString('en-IN')} units</span></div>
-    </div>
-  `).join('');
-}
-
-// Full SO/HQ roster (from master), seeded with zero, overlaid with actual sales
-function soHqRows(rows){
-  const net = {}, qty = {};
-  rows.forEach(r=>{
-    net[r.so] = (net[r.so]||0) + r.na;
-    qty[r.so] = (qty[r.so]||0) + r.q;
+// ===== CUSTOMER TABLE =====
+function renderCustTable(value) {
+  const tbody = document.getElementById('custTbody');
+  const filtered = value === 'All' ? custData : custData.filter(d => groupValue(d,true) === value);
+  const sorted = [...filtered].sort((a,b) => b.amt - a.amt);
+  const totalAmt = custData.reduce((s,d) => s + d.amt, 0);
+  tbody.innerHTML = '';
+  sorted.forEach((c, i) => {
+    const share = (c.amt / totalAmt * 100).toFixed(1);
+    const color = zoneColors[c.zone] || 'var(--cyan)';
+    const zoneMap = {"Delhi/NCR":"DL","Rajasthan":"RJ","West UP & UK":"UP"};
+    const zcode = zoneMap[c.zone] || 'DL';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="rank-num">${String(i+1).padStart(2,'0')}</td>
+      <td style="color:var(--text);font-family:var(--sans);font-size:12px">${c.name}</td>
+      <td><span class="so-tag">${c.so}</span></td>
+      <td><span class="state-badge state-${zcode}">${c.zone}</span></td>
+      <td class="amount-cell" style="color:${color}">₹${(c.amt/1000).toFixed(2)}K</td>
+      <td style="color:var(--text-dim)">${share}%</td>`;
+    tbody.appendChild(tr);
   });
-  const roster = ALL_SO_HQ.length ? ALL_SO_HQ : Object.keys(net).map(so=>({so, hq: rows.find(r=>r.so===so)?.hq || ''}));
-  return roster.map(({so,hq})=>({so, hq, net: net[so]||0, qty: qty[so]||0}))
-    .sort((a,b)=>b.net-a.net);
 }
 
-function renderSoHq(rows){
-  const list = soHqRows(rows);
-  const max = list.length ? Math.max(...list.map(r=>r.net),1) : 1;
-  const box = document.getElementById('bdSoHq');
-  if(!list.length){ box.innerHTML='<div class="empty">No SO/HQ master data loaded — upload master data in admin.html first.</div>'; return; }
-  box.innerHTML = list.map((r,i)=>`
-    <div class="lbrow">
-      <div class="lbrank">${String(i+1).padStart(2,'0')}</div>
-      <div class="lbname">
-        <span class="n">${r.so}${r.hq?' <span class="sub" style="color:var(--muted)">· '+r.hq+'</span>':''}</span>
-        <div class="lbbar"><i style="width:${Math.max(r.net?2:0,100*r.net/max)}%"></i></div>
-      </div>
-      <div class="lbval">${fmtINR(r.net)}<span class="sub">${r.qty.toLocaleString('en-IN')} units</span></div>
-    </div>
-  `).join('');
+// ===== CLOCK =====
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleString('en-IN', {day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}) + ' IST';
 }
+setInterval(updateClock, 1000);
+updateClock();
 
-// Full product roster (from master), seeded with zero, overlaid with actual sales
-function productRows(rows){
-  const net = {}, qty = {};
-  rows.forEach(r=>{
-    net[r.pn] = (net[r.pn]||0) + r.na;
-    qty[r.pn] = (qty[r.pn]||0) + r.q;
-  });
-  const roster = ALL_PRODUCTS.length ? ALL_PRODUCTS : Object.keys(net).map(name=>({code:'', name}));
-  return roster.map(({name})=>({name, net: net[name]||0, qty: qty[name]||0}))
-    .sort((a,b)=>b.net-a.net);
-}
-
-function renderProducts(rows){
-  const list = productRows(rows);
-  const max = list.length ? Math.max(...list.map(r=>r.net),1) : 1;
-  const box = document.getElementById('bdPn');
-  if(!list.length){ box.innerHTML='<div class="empty">No product master data loaded — upload master data in admin.html first.</div>'; return; }
-  box.innerHTML = list.map((r,i)=>`
-    <div class="lbrow">
-      <div class="lbrank">${String(i+1).padStart(2,'0')}</div>
-      <div class="lbname">
-        <span class="n">${r.name}</span>
-        <div class="lbbar"><i style="width:${Math.max(r.net?2:0,100*r.net/max)}%"></i></div>
-      </div>
-      <div class="lbval">${fmtINR(r.net)}<span class="sub">${r.qty.toLocaleString('en-IN')} units</span></div>
-    </div>
-  `).join('');
-}
-
-function renderBreakdowns(rows){
-  renderSoHq(rows);
-  renderProducts(rows);
-  renderBdPanel('bdSt', rows, 'st');
-}
-
-// ---- controls wiring ----
-document.querySelectorAll('#periodTabs .tab').forEach(t=>{
-  t.addEventListener('click', ()=>{
-    document.querySelectorAll('#periodTabs .tab').forEach(x=>x.classList.remove('active'));
-    t.classList.add('active');
-    state.period = t.dataset.p;
-    document.getElementById('monthPickWrap').style.display = state.period==='month' ? 'flex' : 'none';
-    document.getElementById('quarterPickWrap').style.display = state.period==='quarter' ? 'flex' : 'none';
-    document.getElementById('quarterMonthWrap').style.display = state.period==='quarter' ? 'flex' : 'none';
-    document.getElementById('customPickWrap').style.display = state.period==='custom' ? 'flex' : 'none';
-    if(state.period==='quarter') populateQuarterMonths();
-    refresh();
-  });
-});
-document.querySelectorAll('#viewByTabs .tab').forEach(t=>{
-  t.addEventListener('click', ()=>{
-    document.querySelectorAll('#viewByTabs .tab').forEach(x=>x.classList.remove('active'));
-    t.classList.add('active');
-    state.viewBy = t.dataset.v;
-    refresh();
-  });
-});
-function populateQuarterMonths(){
-  const sel = document.getElementById('quarterMonthPick');
-  const months = QUARTERS[state.quarter].filter(k=>monthsMeta[k]);
-  sel.innerHTML = '<option value="ALL">All 3 Months</option>' +
-    months.map(k=>`<option value="${k}">${monthLabel(k)}</option>`).join('');
-  state.quarterMonth = 'ALL';
-  sel.value = 'ALL';
-}
-document.getElementById('monthPick').addEventListener('change', e=>{ state.month=e.target.value; refresh(); });
-document.getElementById('quarterPick').addEventListener('change', e=>{ state.quarter=e.target.value; populateQuarterMonths(); refresh(); });
-document.getElementById('quarterMonthPick').addEventListener('change', e=>{ state.quarterMonth=e.target.value; refresh(); });
-document.getElementById('customFrom').addEventListener('change', e=>{ state.customFrom=e.target.value; refresh(); });
-document.getElementById('customTo').addEventListener('change', e=>{ state.customTo=e.target.value; refresh(); });
-document.getElementById('stateFilter').addEventListener('change', e=>{ state.stateFilter=e.target.value; refresh(); });
-let searchTimer;
-document.getElementById('searchBox').addEventListener('input', e=>{
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(()=>{ state.search=e.target.value; refresh(); }, 250);
-});
-
-function periodLabelStr(){
-  if(state.period==='month') return state.month || 'period';
-  if(state.period==='quarter') return state.quarterMonth!=='ALL' ? state.quarterMonth : state.quarter;
-  return state.period;
-}
-
-window.exportTrendExcel = function(){
-  if(!currentRows.length){ alert('No data to export for the current filters.'); return; }
-  const byDay = {};
-  currentRows.forEach(r=>{ byDay[r.d]=(byDay[r.d]||0)+r.na; });
-  const trendRows = Object.keys(byDay).sort().map(d=>({Date:d, 'Net Sale':Math.round(byDay[d])}));
+// ===== EXPORT =====
+window.exportToExcel = function() {
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(trendRows), 'Daily Trend');
-  XLSX.writeFile(wb, `PIL_OTC_Trend_${periodLabelStr()}.xlsx`);
-};
+  const totalAmt = soData.reduce((s,d) => s+d.amt, 0);
+  const ts = new Date().toLocaleString('en-IN');
 
-window.exportBreakdownExcel = function(key){
-  if(!currentRows.length){ alert('No data to export for the current filters.'); return; }
-  const totalNet = currentRows.reduce((a,r)=>a+r.na,0);
-  const entries = aggBy(currentRows, key);
-  const rows = entries.map(([name,v],i)=>({Rank:i+1, [VIEW_LABELS[key]]:name, Quantity:Math.round(v.qty), 'Net Sale':Math.round(v.net),
-    '% of Total':totalNet ? (100*v.net/totalNet).toFixed(2)+'%' : '0%'}));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), `${VIEW_LABELS[key]} Wise Sales`.slice(0,31));
-  XLSX.writeFile(wb, `PIL_OTC_${VIEW_LABELS[key].replace(/\s/g,'')}Wise_${periodLabelStr()}.xlsx`);
-};
-
-window.exportSoHqExcel = function(){
-  const list = soHqRows(currentRows);
-  if(!list.length){ alert('No SO/HQ master data loaded.'); return; }
-  const totalNet = list.reduce((a,r)=>a+r.net,0);
-  const rows = list.map((r,i)=>({Rank:i+1, SO:r.so, HQ:r.hq, Quantity:Math.round(r.qty), 'Net Sale':Math.round(r.net),
-    '% of Total':totalNet ? (100*r.net/totalNet).toFixed(2)+'%' : '0%'}));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'SO HQ Wise Sales');
-  XLSX.writeFile(wb, `PIL_OTC_SO_HQ_Wise_${periodLabelStr()}.xlsx`);
-};
-
-window.exportProductsExcel = function(){
-  const list = productRows(currentRows);
-  if(!list.length){ alert('No product master data loaded.'); return; }
-  const totalNet = list.reduce((a,r)=>a+r.net,0);
-  const rows = list.map((r,i)=>({Rank:i+1, Product:r.name, Quantity:Math.round(r.qty), 'Net Sale':Math.round(r.net),
-    '% of Total':totalNet ? (100*r.net/totalNet).toFixed(2)+'%' : '0%'}));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Product Wise Sales');
-  XLSX.writeFile(wb, `PIL_OTC_Product_Wise_${periodLabelStr()}.xlsx`);
-};
-
-window.exportLeaderboardExcel = function(){
-  if(!currentRows.length){ alert('No data to export for the current filters.'); return; }
-  const key = state.viewBy;
-  const agg = {};
-  currentRows.forEach(r=>{
-    const k = r[key] || 'UNKNOWN';
-    agg[k] = agg[k] || {Qty:0, NetSale:0};
-    agg[k].Qty += r.q; agg[k].NetSale += r.na;
+  // SO sheet
+  const soRows = [['#','SO NAME','ZONE','NET AMOUNT (₹)','SHARE %']];
+  [...soData].sort((a,b)=>b.amt-a.amt).forEach((d,i) => {
+    soRows.push([i+1, d.name, d.zone, Math.round(d.amt), +((d.amt/totalAmt*100).toFixed(2))]);
   });
-  const totalNet = currentRows.reduce((a,r)=>a+r.na,0);
-  const rows = Object.entries(agg).sort((a,b)=>b[1].NetSale-a[1].NetSale)
-    .map(([name,v],i)=>({Rank:i+1, [VIEW_LABELS[key]]:name, Quantity:Math.round(v.Qty), 'Net Sale':Math.round(v.NetSale),
-      '% of Total':totalNet ? (100*v.NetSale/totalNet).toFixed(2)+'%' : '0%'}));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), `Leaderboard ${VIEW_LABELS[key]}`.slice(0,31));
-  XLSX.writeFile(wb, `PIL_OTC_Leaderboard_${VIEW_LABELS[key].replace(/\s/g,'')}_${periodLabelStr()}.xlsx`);
-};
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(soRows), 'SO Performance');
 
-window.exportExcel = function(){
-  if(!currentRows.length){ alert('No data to export for the current filters.'); return; }
-  const wb = XLSX.utils.book_new();
-
-  // Summary by current View By
-  const key = state.viewBy;
-  const agg = {};
-  currentRows.forEach(r=>{
-    const k = r[key] || 'UNKNOWN';
-    agg[k] = agg[k] || {Qty:0, NetSale:0};
-    agg[k].Qty += r.q; agg[k].NetSale += r.na;
+  // Product sheet
+  const prodRows = [['#','PRODUCT NAME','NET AMOUNT (₹)','SHARE %']];
+  const prodTotal = productData.reduce((s,d) => s+d.amt, 0);
+  [...productData].sort((a,b)=>b.amt-a.amt).forEach((d,i) => {
+    prodRows.push([i+1, d.name, Math.round(d.amt), +((d.amt/prodTotal*100).toFixed(2))]);
   });
-  const totalNet = currentRows.reduce((a,r)=>a+r.na,0);
-  const summaryRows = Object.entries(agg).sort((a,b)=>b[1].NetSale-a[1].NetSale)
-    .map(([name,v],i)=>({Rank:i+1, [VIEW_LABELS[key]]:name, Quantity:Math.round(v.Qty), 'Net Sale':Math.round(v.NetSale),
-      '% of Total':totalNet ? (100*v.NetSale/totalNet).toFixed(2)+'%' : '0%'}));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), `Summary by ${VIEW_LABELS[key]}`.slice(0,31));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(prodRows), 'Product Performance');
 
-  // Daily trend
-  const byDay = {};
-  currentRows.forEach(r=>{ byDay[r.d]=(byDay[r.d]||0)+r.na; });
-  const trendRows = Object.keys(byDay).sort().map(d=>({Date:d, 'Net Sale':Math.round(byDay[d])}));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(trendRows), 'Daily Trend');
+  // Stockist sheet
+  const custRows = [['#','STOCKIST NAME','SO','ZONE','NET AMOUNT (₹)','SHARE %']];
+  [...custData].sort((a,b)=>b.amt-a.amt).forEach((d,i) => {
+    custRows.push([i+1, d.name, d.so, d.zone, Math.round(d.amt), +((d.amt/totalAmt*100).toFixed(2))]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(custRows), 'Stockist Data');
 
-  // Full detail
-  const detailRows = currentRows.map(r=>({
-    Date:r.d, SO:r.so, Mapped:r.mapped?'Yes':'No', ASM:r.asm, RSM:r.rsm, ZSM:r.zsm,
-    Area_HQ:r.hq, State:r.st, Party:r.cn, CustomerCode:r.cc,
-    Product:r.pn, ProductCode:r.pc, Category:r.cat, Quantity:r.q, NetSale:Math.round(r.na)
-  }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRows), 'Detail Rows');
+  // Daily sheet
+  if (dailyData.length) {
+    const dRows = [['DATE','NET BILLING (₹)']];
+    [...dailyData].sort((a,b) => new Date(a.date)-new Date(b.date)).forEach(d => dRows.push([d.date, Math.round(d.amt)]));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dRows), 'Daily Trend');
+  }
 
-  XLSX.writeFile(wb, `PIL_OTC_${periodLabelStr()}_${VIEW_LABELS[key].replace(/\s/g,'')}.xlsx`);
+  const filename = `PIL_OTC_${currentViewBy}_${currentFilterValue.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  XLSX.writeFile(wb, filename);
+  const toast = document.getElementById('exportToast');
+  toast.textContent = `✓ Exported: ${filename}`;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
 };
-
-(async function init(){
-  await loadMaster();
-  await loadMonthsMeta();
-  await refresh();
-  setInterval(async ()=>{ await loadMonthsMeta(); }, 5*60*1000);
-})();
 </script>
 </body>
 </html>
