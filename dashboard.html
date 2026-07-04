@@ -233,6 +233,16 @@
     </div>
   </div>
 
+  <div class="panel" style="margin-bottom:16px">
+    <h3>SO Wise Product Sales
+      <span style="display:flex;align-items:center;gap:10px">
+        <select id="soProductPick" style="min-width:170px"></select>
+        <button class="tileExport" onclick="exportSoProductExcel()" title="Export SO wise product sales">⇩</button>
+      </span>
+    </h3>
+    <div id="bdSoProduct" class="bdlist" style="max-height:520px"></div>
+  </div>
+
   <footer>PIL OTC Division · Internal use only · Data source: SAP billing export</footer>
 </div>
 
@@ -283,7 +293,7 @@ async function loadMaster(){
 let cache = {};            // key -> array of records
 let state = {
   period:'month', month:null, quarter:'Q1', quarterMonth:'ALL', customFrom:null, customTo:null,
-  viewBy:'so', stateFilter:'ALL', search:''
+  viewBy:'so', stateFilter:'ALL', search:'', soProductPick:null
 };
 let currentRows = [];
 
@@ -587,10 +597,54 @@ function renderProducts(rows){
   `).join('');
 }
 
+// Full product roster for a single SO — seeded with zero for every master product,
+// overlaid with actual sales, so the complete range always shows even at zero units.
+function soProductRows(rows, so){
+  const net = {}, qty = {};
+  rows.forEach(r=>{
+    if(r.so !== so) return;
+    net[r.pn] = (net[r.pn]||0) + r.na;
+    qty[r.pn] = (qty[r.pn]||0) + r.q;
+  });
+  const roster = ALL_PRODUCTS.length ? ALL_PRODUCTS : Object.keys(net).map(name=>({code:'', name}));
+  return roster.map(({name})=>({name, net: net[name]||0, qty: qty[name]||0}))
+    .sort((a,b)=>b.net-a.net);
+}
+
+function populateSoProductPick(){
+  const sel = document.getElementById('soProductPick');
+  const curVal = sel.value;
+  const options = ALL_SO_HQ.length ? ALL_SO_HQ.map(r=>r.so) : [...new Set(currentRows.map(r=>r.so))].sort();
+  sel.innerHTML = options.map(so=>`<option value="${so}">${so}</option>`).join('');
+  if(options.includes(curVal)) sel.value = curVal;
+  state.soProductPick = sel.value;
+}
+
+function renderSoProduct(rows){
+  populateSoProductPick();
+  const so = state.soProductPick || document.getElementById('soProductPick').value;
+  const box = document.getElementById('bdSoProduct');
+  if(!so){ box.innerHTML='<div class="empty">No SO master data loaded — upload master data in admin.html first.</div>'; return; }
+  const list = soProductRows(rows, so);
+  if(!list.length){ box.innerHTML='<div class="empty">No product master data loaded — upload master data in admin.html first.</div>'; return; }
+  const max = Math.max(...list.map(r=>r.net),1);
+  box.innerHTML = list.map((r,i)=>`
+    <div class="lbrow">
+      <div class="lbrank">${String(i+1).padStart(2,'0')}</div>
+      <div class="lbname">
+        <span class="n">${r.name}</span>
+        <div class="lbbar"><i style="width:${Math.max(r.net?2:0,100*r.net/max)}%"></i></div>
+      </div>
+      <div class="lbval">${fmtINR(r.net)}<span class="sub">${r.qty.toLocaleString('en-IN')} units</span></div>
+    </div>
+  `).join('');
+}
+
 function renderBreakdowns(rows){
   renderSoHq(rows);
   renderProducts(rows);
   renderBdPanel('bdSt', rows, 'st');
+  renderSoProduct(rows);
 }
 
 // ---- controls wiring ----
@@ -629,6 +683,7 @@ document.getElementById('quarterMonthPick').addEventListener('change', e=>{ stat
 document.getElementById('customFrom').addEventListener('change', e=>{ state.customFrom=e.target.value; refresh(); });
 document.getElementById('customTo').addEventListener('change', e=>{ state.customTo=e.target.value; refresh(); });
 document.getElementById('stateFilter').addEventListener('change', e=>{ state.stateFilter=e.target.value; refresh(); });
+document.getElementById('soProductPick').addEventListener('change', e=>{ state.soProductPick=e.target.value; renderSoProduct(currentRows); });
 let searchTimer;
 document.getElementById('searchBox').addEventListener('input', e=>{
   clearTimeout(searchTimer);
@@ -706,6 +761,19 @@ window.exportProductsExcel = function(){
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Product Wise Sales');
   XLSX.writeFile(wb, `PIL_OTC_Product_Wise_${periodLabelStr()}.xlsx`);
+};
+
+window.exportSoProductExcel = function(){
+  const so = state.soProductPick || document.getElementById('soProductPick').value;
+  if(!so){ alert('No SO selected / SO master data loaded.'); return; }
+  const list = soProductRows(currentRows, so);
+  if(!list.length){ alert('No product master data loaded.'); return; }
+  const totalNet = list.reduce((a,r)=>a+r.net,0);
+  const rows = list.map((r,i)=>({Rank:i+1, SO:so, Product:r.name, Quantity:Math.round(r.qty), 'Net Sale':Math.round(r.net),
+    '% of Total':totalNet ? (100*r.net/totalNet).toFixed(2)+'%' : '0%'}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'SO Wise Product Sales');
+  XLSX.writeFile(wb, `PIL_OTC_SO_${so}_Product_Wise_${periodLabelStr()}.xlsx`);
 };
 
 window.exportLeaderboardExcel = function(){
