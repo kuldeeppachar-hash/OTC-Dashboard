@@ -113,7 +113,19 @@
     </div>
 
     <div class="card">
-      <h2>2 · Monthly Sales Import</h2>
+      <h2>2 · SO Target Sheet</h2>
+      <p class="desc">Upload the product-wise target template (must contain a sheet named exactly <code>Target Sheet</code> with columns Product Code, Product Description, Target Quantity, Net Value (Rs)). This template applies identically to every SO — the sheet's total becomes each SO's constant monthly target. Re-upload any time to replace.</p>
+      <label>Target sheet file (.xlsx)</label>
+      <input type="file" id="targetFile" accept=".xlsx,.xls">
+      <div class="row">
+        <button onclick="handleTargetUpload()">Parse &amp; Push Target Template</button>
+        <span id="targetCount" class="small"></span>
+      </div>
+      <div id="targetStatus" class="status"></div>
+    </div>
+
+    <div class="card">
+      <h2>3 · Monthly Sales Import</h2>
       <p class="desc">Upload a raw SAP billing export (any month, either column format — auto-detected). Rows are filtered to OTC product codes only, joined to Party List for SO name, and rolled up by HQ/State from the file itself. Master data must be loaded first.</p>
       <label>Monthly sales file (.xlsx)</label>
       <input type="file" id="salesFile" accept=".xlsx,.xls">
@@ -141,7 +153,7 @@
     </div>
 
     <div class="card">
-      <h2>3 · Months in Database</h2>
+      <h2>4 · Months in Database</h2>
       <div class="row"><button class="ghost" onclick="loadMonthsList()">Refresh list</button></div>
       <table id="monthsTable">
         <thead><tr><th>Month</th><th class="num">Rows</th><th class="num">Net Sale</th><th>Imported</th><th></th></tr></thead>
@@ -310,6 +322,49 @@ async function handleMasterUpload(){
   }
 }
 window.handleMasterUpload = handleMasterUpload;
+
+// ---------- SO Target sheet (constant product-wise template, applied to every SO) ----------
+async function handleTargetUpload(){
+  const f = document.getElementById('targetFile').files[0];
+  const st = document.getElementById('targetStatus');
+  if(!f){ st.className='status show err'; st.textContent='Choose a file first.'; return; }
+  st.className='status show info'; st.textContent='Reading workbook...';
+  try{
+    const buf = await f.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array', cellDates:true});
+    const sheet = wb.Sheets['Target Sheet'];
+    if(!sheet) throw new Error('Sheet "Target Sheet" not found in workbook.');
+    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true});
+    const hdrIdx = findHeaderRow(rows, ['Product Code','Target Quantity']);
+    if(hdrIdx === -1) throw new Error('Header row with "Product Code" and "Target Quantity" not found.');
+    const hdr = rows[hdrIdx];
+    const codeC = colIndex(hdr, ['Product Code']);
+    const nameC = colIndex(hdr, ['Product Description']);
+    const qtyC = colIndex(hdr, ['Target Quantity']);
+    const netC = colIndex(hdr, ['Net Value (Rs)','Net Value']);
+    if(qtyC === -1 || netC === -1) throw new Error('Required columns "Target Quantity" / "Net Value (Rs)" not found.');
+
+    const template = [];
+    let total = 0;
+    for(let i=hdrIdx+1;i<rows.length;i++){
+      const r = rows[i]; if(!r || r[codeC]===undefined || r[codeC]===null || r[codeC]==='') continue;
+      const net = Number(r[netC])||0;
+      template.push({ code: normCode(r[codeC]), name: r[nameC]||'', qty: Number(r[qtyC])||0, net });
+      total += net;
+    }
+    if(!template.length) throw new Error('No valid product rows found.');
+
+    await set(ref(db,'targets'), { template, total: Math.round(total*100)/100, updatedAt: Date.now() });
+
+    document.getElementById('targetCount').textContent = `${template.length} products · total ₹${total.toLocaleString('en-IN',{maximumFractionDigits:2})} per SO`;
+    st.className='status show ok';
+    st.textContent = `Target template pushed to Firebase — applied identically to every SO.`;
+  }catch(e){
+    st.className='status show err'; st.textContent = 'Error: ' + e.message;
+    console.error(e);
+  }
+}
+window.handleTargetUpload = handleTargetUpload;
 
 async function ensureMasterLoaded(){
   if(Object.keys(MASTER.products).length) return true;

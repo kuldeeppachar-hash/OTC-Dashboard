@@ -234,6 +234,16 @@
   </div>
 
   <div class="panel" style="margin-bottom:16px">
+    <h3>Target vs Achievement (SO Wise)
+      <span style="display:flex;align-items:center;gap:10px">
+        <span id="targetSummary" class="small" style="color:var(--muted);font-size:11.5px"></span>
+        <button class="tileExport" onclick="exportTargetExcel()" title="Export target vs achievement">⇩</button>
+      </span>
+    </h3>
+    <div id="bdTarget" class="bdlist" style="max-height:640px"></div>
+  </div>
+
+  <div class="panel" style="margin-bottom:16px">
     <h3>SO Wise Product Sales
       <span style="display:flex;align-items:center;gap:10px">
         <select id="soProductPick" style="min-width:170px"></select>
@@ -273,6 +283,17 @@ let monthsMeta = {};       // key -> {rowCount, netTotal, importedAt}
 let MASTER = { products:{}, parties:{}, team:{} };
 let ALL_SO_HQ = [];   // [{so, hq}]
 let ALL_PRODUCTS = []; // [{code, name}]
+let TARGETS = { template:[], total:200000 };
+
+async function loadTargets(){
+  const snap = await get(ref(db,'targets'));
+  if(snap.exists()){
+    const v = snap.val();
+    TARGETS = { template: v.template||[], total: v.total||200000 };
+  } else {
+    TARGETS = { template:[], total:200000 };
+  }
+}
 
 async function loadMaster(){
   const snap = await get(ref(db,'master'));
@@ -344,6 +365,34 @@ function periodKeys(){
     });
   }
   return [];
+}
+
+// Scales the flat monthly target to whatever period is selected: full month(s) for
+// month/quarter/fytd views, and a day-weighted fraction of each overlapped month for custom ranges.
+function daysInMonth(y,m){ return new Date(y,m,0).getDate(); }
+function periodTargetMultiplier(){
+  const keys = periodKeys();
+  if(!keys.length) return 0;
+  let mult = 0;
+  keys.forEach(k=>{
+    const [y,m] = k.split('-').map(Number);
+    const dim = daysInMonth(y,m);
+    if(state.period==='custom' && state.customFrom && state.customTo){
+      const first = `${k}-01`, last = `${k}-${String(dim).padStart(2,'0')}`;
+      const from = state.customFrom > first ? state.customFrom : first;
+      const to = state.customTo < last ? state.customTo : last;
+      if(from <= to){
+        const overlapDays = Math.round((new Date(to)-new Date(from))/86400000) + 1;
+        mult += overlapDays/dim;
+      }
+    } else {
+      mult += 1;
+    }
+  });
+  return mult;
+}
+function soTarget(so){
+  return TARGETS.total || 200000;
 }
 
 function prevPeriodKeys(){
@@ -640,10 +689,57 @@ function renderSoProduct(rows){
   `).join('');
 }
 
+function targetRows(rows){
+  const net = {};
+  rows.forEach(r=>{ net[r.so] = (net[r.so]||0) + r.na; });
+  const roster = ALL_SO_HQ.length ? ALL_SO_HQ.map(r=>r.so) : Object.keys(net);
+  const mult = periodTargetMultiplier();
+  return roster.map(so=>{
+    const target = soTarget(so) * mult;
+    const ach = net[so] || 0;
+    const pct = target ? (100*ach/target) : 0;
+    return { so, target, ach, pct };
+  }).sort((a,b)=>b.pct-a.pct);
+}
+
+function renderTarget(rows){
+  const box = document.getElementById('bdTarget');
+  const list = targetRows(rows);
+  if(!list.length){ box.innerHTML='<div class="empty">No SO master data loaded — upload master data in admin.html first.</div>'; return; }
+  const totalTarget = list.reduce((a,r)=>a+r.target,0);
+  const totalAch = list.reduce((a,r)=>a+r.ach,0);
+  const totalPct = totalTarget ? (100*totalAch/totalTarget) : 0;
+  document.getElementById('targetSummary').textContent =
+    `Overall: ${fmtINR(totalAch)} / ${fmtINR(totalTarget)} (${totalPct.toFixed(1)}%)`;
+  box.innerHTML = list.map((r,i)=>{
+    const color = r.pct>=100 ? 'var(--green)' : r.pct>=75 ? 'var(--amber)' : 'var(--red)';
+    return `
+    <div class="lbrow">
+      <div class="lbrank">${String(i+1).padStart(2,'0')}</div>
+      <div class="lbname">
+        <span class="n">${r.so}</span>
+        <div class="lbbar"><i style="width:${Math.min(100,r.pct).toFixed(1)}%;background:${color}"></i></div>
+      </div>
+      <div class="lbval">${fmtINR(r.ach)}<span class="sub">of ${fmtINR(r.target)} · ${r.pct.toFixed(1)}%</span></div>
+    </div>`;
+  }).join('');
+}
+
+window.exportTargetExcel = function(){
+  const list = targetRows(currentRows);
+  if(!list.length){ alert('No SO master data loaded.'); return; }
+  const rows = list.map((r,i)=>({Rank:i+1, SO:r.so, Target:Math.round(r.target), Achievement:Math.round(r.ach),
+    'Achievement %':r.pct.toFixed(2)+'%', Gap:Math.round(r.target-r.ach)}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Target vs Achievement');
+  XLSX.writeFile(wb, `PIL_OTC_Target_vs_Achievement_${periodLabelStr()}.xlsx`);
+};
+
 function renderBreakdowns(rows){
   renderSoHq(rows);
   renderProducts(rows);
   renderBdPanel('bdSt', rows, 'st');
+  renderTarget(rows);
   renderSoProduct(rows);
 }
 
@@ -831,6 +927,7 @@ window.exportExcel = function(){
 
 (async function init(){
   await loadMaster();
+  await loadTargets();
   await loadMonthsMeta();
   await refresh();
   setInterval(async ()=>{ await loadMonthsMeta(); }, 5*60*1000);
