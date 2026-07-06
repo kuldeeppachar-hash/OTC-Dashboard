@@ -649,7 +649,11 @@ function renderProducts(rows){
 function targetByProductCode(){
   const mult = periodTargetMultiplier();
   const map = {};
-  (TARGETS.template||[]).forEach(t=>{ map[t.code] = (map[t.code]||0) + (t.net||0)*mult; });
+  (TARGETS.template||[]).forEach(t=>{
+    if(!map[t.code]) map[t.code] = {net:0, qty:0};
+    map[t.code].net += (t.net||0)*mult;
+    map[t.code].qty += (t.qty||0)*mult;
+  });
   return map;
 }
 
@@ -665,9 +669,10 @@ function soProductRows(rows, so){
   const roster = ALL_PRODUCTS.length ? ALL_PRODUCTS : Object.keys(net).map(name=>({code:'', name}));
   const tgtMap = targetByProductCode();
   return roster.map(({code,name})=>{
-    const target = tgtMap[code] || 0;
-    const rNet = net[name]||0;
-    return { code, name, net: rNet, qty: qty[name]||0, target, pct: target ? (100*rNet/target) : 0 };
+    const t = tgtMap[code] || {net:0, qty:0};
+    const rNet = net[name]||0, rQty = qty[name]||0;
+    return { code, name, net: rNet, qty: rQty, target: t.net, targetQty: t.qty,
+      pct: t.qty ? (100*rQty/t.qty) : (t.net ? 100*rNet/t.net : 0) };
   }).sort((a,b)=>b.net-a.net);
 }
 
@@ -688,11 +693,13 @@ function renderSoProduct(rows){
   const list = soProductRows(rows, so);
   if(!list.length){ box.innerHTML='<div class="empty">No product master data loaded — upload master data in admin.html first.</div>'; return; }
   const max = Math.max(...list.map(r=>r.net),1);
-  const hasTargets = list.some(r=>r.target>0);
+  const hasTargets = list.some(r=>r.targetQty>0);
   box.innerHTML = list.map((r,i)=>{
-    const color = !r.target ? 'var(--cyan)' : r.pct>=100 ? 'var(--green)' : r.pct>=75 ? 'var(--amber)' : 'var(--red)';
+    const color = !r.targetQty ? 'var(--cyan)' : r.pct>=100 ? 'var(--green)' : r.pct>=75 ? 'var(--amber)' : 'var(--red)';
     const sub = hasTargets
-      ? (r.target ? `${r.qty.toLocaleString('en-IN')} units · ${fmtINR(r.target)} target · ${r.pct.toFixed(1)}%` : `${r.qty.toLocaleString('en-IN')} units · no target set`)
+      ? (r.targetQty
+          ? `${Math.round(r.qty).toLocaleString('en-IN')}/${Math.round(r.targetQty).toLocaleString('en-IN')} units · ${r.pct.toFixed(1)}%`
+          : `${r.qty.toLocaleString('en-IN')} units · no target set`)
       : `${r.qty.toLocaleString('en-IN')} units`;
     return `
     <div class="lbrow">
@@ -884,7 +891,8 @@ window.exportSoProductExcel = function(){
   const totalNet = list.reduce((a,r)=>a+r.net,0);
   const rows = list.map((r,i)=>({Rank:i+1, SO:so, Product:r.name, Quantity:Math.round(r.qty), 'Net Sale':Math.round(r.net),
     '% of Total':totalNet ? (100*r.net/totalNet).toFixed(2)+'%' : '0%',
-    Target:Math.round(r.target), 'Achievement %':r.target ? r.pct.toFixed(2)+'%' : 'no target set'}));
+    'Target Qty':Math.round(r.targetQty), 'Target Net':Math.round(r.target),
+    'Achievement %':r.targetQty ? r.pct.toFixed(2)+'%' : 'no target set'}));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'SO Wise Product Sales');
   XLSX.writeFile(wb, `PIL_OTC_SO_${so}_Product_Wise_${periodLabelStr()}.xlsx`);
