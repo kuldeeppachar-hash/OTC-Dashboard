@@ -926,11 +926,19 @@ window.exportExcel = function(){
 };
 
 (async function init(){
-  await loadMaster();
-  await loadTargets();
-  await loadMonthsMeta();
-  await refresh();
-  setInterval(async ()=>{ await loadMonthsMeta(); }, 5*60*1000);
+  const safeInit = async (fn,label) => {
+    try{ await fn(); }
+    catch(e){
+      console.error('Init step failed:',label,e);
+      const lu = document.getElementById('lastUpdate');
+      if(lu) lu.textContent = `error (${label}) — see console`;
+    }
+  };
+  await safeInit(loadMaster,'loadMaster');
+  await safeInit(loadTargets,'loadTargets');
+  await safeInit(loadMonthsMeta,'loadMonthsMeta');
+  await safeInit(refresh,'refresh');
+  setInterval(async ()=>{ await safeInit(loadMonthsMeta,'loadMonthsMeta'); }, 5*60*1000);
 })();
 </script>
 </body>
