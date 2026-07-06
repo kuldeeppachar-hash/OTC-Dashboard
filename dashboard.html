@@ -646,6 +646,13 @@ function renderProducts(rows){
   `).join('');
 }
 
+function targetByProductCode(){
+  const mult = periodTargetMultiplier();
+  const map = {};
+  (TARGETS.template||[]).forEach(t=>{ map[t.code] = (map[t.code]||0) + (t.net||0)*mult; });
+  return map;
+}
+
 // Full product roster for a single SO — seeded with zero for every master product,
 // overlaid with actual sales, so the complete range always shows even at zero units.
 function soProductRows(rows, so){
@@ -656,8 +663,12 @@ function soProductRows(rows, so){
     qty[r.pn] = (qty[r.pn]||0) + r.q;
   });
   const roster = ALL_PRODUCTS.length ? ALL_PRODUCTS : Object.keys(net).map(name=>({code:'', name}));
-  return roster.map(({name})=>({name, net: net[name]||0, qty: qty[name]||0}))
-    .sort((a,b)=>b.net-a.net);
+  const tgtMap = targetByProductCode();
+  return roster.map(({code,name})=>{
+    const target = tgtMap[code] || 0;
+    const rNet = net[name]||0;
+    return { code, name, net: rNet, qty: qty[name]||0, target, pct: target ? (100*rNet/target) : 0 };
+  }).sort((a,b)=>b.net-a.net);
 }
 
 function populateSoProductPick(){
@@ -677,16 +688,22 @@ function renderSoProduct(rows){
   const list = soProductRows(rows, so);
   if(!list.length){ box.innerHTML='<div class="empty">No product master data loaded — upload master data in admin.html first.</div>'; return; }
   const max = Math.max(...list.map(r=>r.net),1);
-  box.innerHTML = list.map((r,i)=>`
+  const hasTargets = list.some(r=>r.target>0);
+  box.innerHTML = list.map((r,i)=>{
+    const color = !r.target ? 'var(--cyan)' : r.pct>=100 ? 'var(--green)' : r.pct>=75 ? 'var(--amber)' : 'var(--red)';
+    const sub = hasTargets
+      ? (r.target ? `${r.qty.toLocaleString('en-IN')} units · ${fmtINR(r.target)} target · ${r.pct.toFixed(1)}%` : `${r.qty.toLocaleString('en-IN')} units · no target set`)
+      : `${r.qty.toLocaleString('en-IN')} units`;
+    return `
     <div class="lbrow">
       <div class="lbrank">${String(i+1).padStart(2,'0')}</div>
       <div class="lbname">
         <span class="n">${r.name}</span>
-        <div class="lbbar"><i style="width:${Math.max(r.net?2:0,100*r.net/max)}%"></i></div>
+        <div class="lbbar"><i style="width:${Math.max(r.net?2:0,100*r.net/max)}%;background:${color}"></i></div>
       </div>
-      <div class="lbval">${fmtINR(r.net)}<span class="sub">${r.qty.toLocaleString('en-IN')} units</span></div>
-    </div>
-  `).join('');
+      <div class="lbval">${fmtINR(r.net)}<span class="sub">${sub}</span></div>
+    </div>`;
+  }).join('');
 }
 
 function targetRows(rows){
@@ -866,7 +883,8 @@ window.exportSoProductExcel = function(){
   if(!list.length){ alert('No product master data loaded.'); return; }
   const totalNet = list.reduce((a,r)=>a+r.net,0);
   const rows = list.map((r,i)=>({Rank:i+1, SO:so, Product:r.name, Quantity:Math.round(r.qty), 'Net Sale':Math.round(r.net),
-    '% of Total':totalNet ? (100*r.net/totalNet).toFixed(2)+'%' : '0%'}));
+    '% of Total':totalNet ? (100*r.net/totalNet).toFixed(2)+'%' : '0%',
+    Target:Math.round(r.target), 'Achievement %':r.target ? r.pct.toFixed(2)+'%' : 'no target set'}));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'SO Wise Product Sales');
   XLSX.writeFile(wb, `PIL_OTC_SO_${so}_Product_Wise_${periodLabelStr()}.xlsx`);
