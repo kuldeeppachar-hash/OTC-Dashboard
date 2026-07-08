@@ -234,6 +234,13 @@
   </div>
 
   <div class="panel" style="margin-bottom:16px">
+    <h3><span>Party Wise Net Sales <span class="n">top 50</span></span>
+      <button class="tileExport" onclick="exportBreakdownExcel('cn')" title="Export party wise sales">⇩</button>
+    </h3>
+    <div id="bdParty" class="bdlist" style="max-height:640px"></div>
+  </div>
+
+  <div class="panel" style="margin-bottom:16px">
     <h3>Target vs Achievement (SO Wise)
       <span style="display:flex;align-items:center;gap:10px">
         <span id="targetSummary" class="small" style="color:var(--muted);font-size:11.5px"></span>
@@ -272,7 +279,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-const VIEW_LABELS = {so:'SO', hq:'Area (HQ)', st:'State', pn:'Product', asm:'ASM'};
+const VIEW_LABELS = {so:'SO', hq:'Area (HQ)', st:'State', pn:'Product', asm:'ASM', cn:'Party'};
 const QUARTERS = {
   Q1:['2026-04','2026-05','2026-06'], Q2:['2026-07','2026-08','2026-09'],
   Q3:['2026-10','2026-11','2026-12'], Q4:['2027-01','2027-02','2027-03']
@@ -763,6 +770,7 @@ function renderBreakdowns(rows){
   renderSoHq(rows);
   renderProducts(rows);
   renderBdPanel('bdSt', rows, 'st');
+  renderBdPanel('bdParty', rows, 'cn');
   renderTarget(rows);
   renderSoProduct(rows);
 }
