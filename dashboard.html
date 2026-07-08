@@ -972,6 +972,10 @@ window.exportExcel = function(){
   await safeInit(loadTargets,'loadTargets');
   await safeInit(loadMonthsMeta,'loadMonthsMeta');
   await safeInit(refresh,'refresh');
+  // debug hooks — type TARGETS / ALL_PRODUCTS / DEBUG_soProduct() in the browser console to inspect live state
+  window.TARGETS = TARGETS;
+  window.ALL_PRODUCTS = ALL_PRODUCTS;
+  window.DEBUG_soProduct = (so)=> soProductRows(currentRows, so || document.getElementById('soProductPick').value);
   setInterval(async ()=>{ await safeInit(loadMonthsMeta,'loadMonthsMeta'); }, 5*60*1000);
 })();
 </script>
