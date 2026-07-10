@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PIL OTC — Sales Command</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#080B10">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="OTC Sales">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -978,6 +986,13 @@ window.exportExcel = function(){
   window.DEBUG_soProduct = (so)=> soProductRows(currentRows, so || document.getElementById('soProductPick').value);
   setInterval(async ()=>{ await safeInit(loadMonthsMeta,'loadMonthsMeta'); }, 5*60*1000);
 })();
+
+// PWA install support — safe no-op if hosting doesn't support it (e.g. local file:// testing)
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('service-worker.js').catch(e=>console.warn('SW registration failed:',e));
+  });
+}
 </script>
 </body>
 </html>
