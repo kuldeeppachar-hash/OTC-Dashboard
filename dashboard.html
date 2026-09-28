@@ -644,7 +644,9 @@ function productRows(rows){
     qty[r.pn] = (qty[r.pn]||0) + r.q;
   });
   const roster = ALL_PRODUCTS.length ? ALL_PRODUCTS : Object.keys(net).map(name=>({code:'', name}));
-  return roster.map(({name})=>({name, net: net[name]||0, qty: qty[name]||0}))
+  const known = new Set(roster.map(r=>r.name));
+  const extra = Object.keys(net).filter(n=>!known.has(n)).map(n=>({name:n+' · not in Product List', net:net[n], qty:qty[n]||0}));
+  return roster.map(({name})=>({name, net: net[name]||0, qty: qty[name]||0})).concat(extra)
     .sort((a,b)=>b.net-a.net);
 }
 
@@ -687,9 +689,9 @@ function soProductRows(rows, so){
   });
   const roster = ALL_PRODUCTS.length ? ALL_PRODUCTS : Object.keys(net).map(name=>({code:'', name}));
   const tgtMap = targetByProductCode();
-  return roster.map(({code,name})=>{
+  return roster.concat(Object.keys(net).filter(n=>!roster.some(x=>x.name===n)).map(n=>({code:'',name:n+' · not in Product List', _raw:n}))).map(({code,name,_raw})=>{
     const t = tgtMap[code] || {net:0, qty:0};
-    const rNet = net[name]||0, rQty = qty[name]||0;
+    const rNet = net[_raw||name]||0, rQty = qty[_raw||name]||0;
     return { code, name, net: rNet, qty: rQty, target: t.net, targetQty: t.qty,
       pct: t.qty ? (100*rQty/t.qty) : (t.net ? 100*rNet/t.net : 0) };
   }).sort((a,b)=>b.net-a.net);

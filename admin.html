@@ -143,10 +143,13 @@
           <tr><th>Net Sale (OTC)</th><td id="pvNet">—</td></tr>
           <tr><th>SO-mapped rows</th><td id="pvMapped">—</td></tr>
           <tr><th>Unmapped rows <span class="small">(customer not in Party List)</span></th><td id="pvUnmapped">—</td></tr>
+          <tr><th>Excluded: other division <span class="small">(product in list, SAP Division not OTC)</span></th><td id="pvOtherDiv">—</td></tr>
+          <tr><th>Missing in Product List <span class="small">(OTC in SAP, included &amp; flagged)</span></th><td id="pvMissing">—<div id="pvMissingList"></div></td></tr>
         </table>
         <div class="row" style="margin-top:16px">
           <button onclick="pushMonthToFirebase()" id="pushBtn">Push this month to Firebase</button>
           <button class="ghost" onclick="downloadUnmapped()">Download unmapped rows (Excel)</button>
+          <button class="ghost" onclick="downloadMissingProducts()">Download products missing in master (Excel)</button>
         </div>
         <div id="pushStatus" class="status"></div>
       </div>
@@ -418,9 +421,10 @@ async function handleSalesParse(){
       throw new Error('Could not find required columns (Invoice Date / Product Code / Customer Code / Net Amount). Check the file headers.');
     }
 
-    let total=0, otcCount=0, mappedCount=0, unmappedCount=0, netSum=0;
+    let otherDivCount=0, otherDivNet=0, npCount=0, npNet=0, total=0, otcCount=0, mappedCount=0, unmappedCount=0, netSum=0;
     const records = [];
     const unmappedSample = [];
+    const missingProducts = {};
     let detectedMonth = null;
 
     for(let i=1;i<rows.length;i++){
@@ -428,9 +432,20 @@ async function handleSalesParse(){
       if(!r || r[cDate]===undefined || r[cDate]===null || r[cDate]==='') continue;
       total++;
       const code = normCode(r[cProdCode]);
-      const prod = MASTER.products[code];
-      if(!prod) continue; // not an OTC product code -> excluded
-      if(cDivName>=0 && r[cDivName] && norm(r[cDivName]) !== 'OTC') continue; // safety net
+      const inList = !!MASTER.products[code];
+      // Division rule: when SAP gives a Division Name, only OTC counts. Other divisions are never included.
+      const hasDiv = cDivName>=0 && r[cDivName] !== undefined && r[cDivName] !== null && String(r[cDivName]).trim() !== '';
+      const isOtcDiv = hasDiv && norm(r[cDivName]) === 'OTC';
+      if(hasDiv ? !isOtcDiv : !inList){
+        if(inList){ otherDivCount++; otherDivNet += Number(r[cNet])||0; }
+        continue;
+      }
+      const prod = MASTER.products[code] || { name:(r[cProdDesc]||'').toString().trim() || code, category:'Not in Product List' };
+      if(!inList){
+        npCount++; npNet += Number(r[cNet])||0;
+        const m = missingProducts[code] || (missingProducts[code] = {productCode:code, productDescription:(r[cProdDesc]||'').toString().trim(), rows:0, netAmount:0, qty:0});
+        m.rows++; m.netAmount += Number(r[cNet])||0; m.qty += Number(r[cQty])||0;
+      }
 
       const dt = excelDateToJS(r[cDate]);
       if(!dt) continue;
@@ -441,10 +456,9 @@ async function handleSalesParse(){
       const soName = party ? party.so : 'UNMAPPED';
       let hq = (cHq>=0 ? (r[cHq]||'') : '').toString().trim();
       let state = (cState>=0 ? (r[cState]||'') : '').toString().trim();
-      if(!hq && party) hq = party.hq;
-      if(!state){
-        state = party ? party.state : (MASTER.hqToState[norm(hq)] || '');
-      }
+      if(party && party.hq) hq = party.hq;
+      if(party && party.state) state = party.state;
+      else if(!state) state = MASTER.hqToState[norm(hq)] || '';
       const team = MASTER.team[norm(soName)] || {};
 
       otcCount++;
@@ -474,7 +488,8 @@ async function handleSalesParse(){
     PARSED_MONTH = {
       key: detectedMonth, records,
       stats: { total, otcCount, mappedCount, unmappedCount, netSum, format },
-      unmappedSample
+      unmappedSample, missingProducts: Object.values(missingProducts).sort((a,b)=>b.netAmount-a.netAmount),
+      otherDiv:{count:otherDivCount, net:otherDivNet}
     };
 
     document.getElementById('pvMonth').textContent = detectedMonth || 'unknown';
@@ -484,8 +499,12 @@ async function handleSalesParse(){
     document.getElementById('pvNet').textContent = '₹' + netSum.toLocaleString('en-IN',{maximumFractionDigits:0});
     document.getElementById('pvMapped').textContent = mappedCount.toLocaleString('en-IN') + ` (${(100*mappedCount/otcCount).toFixed(1)}%)`;
     document.getElementById('pvUnmapped').textContent = unmappedCount.toLocaleString('en-IN') + ` (${(100*unmappedCount/otcCount).toFixed(1)}%)`;
+    document.getElementById('pvOtherDiv').textContent = otherDivCount.toLocaleString('en-IN') + ` rows · ₹${Math.round(otherDivNet).toLocaleString('en-IN')}`;
+    const mp = PARSED_MONTH.missingProducts;
+    document.getElementById('pvMissing').textContent = mp.length ? `${mp.length} products · ${npCount} rows · ₹${Math.round(npNet).toLocaleString('en-IN')}` : 'None';
+    document.getElementById('pvMissingList').innerHTML = mp.length ? '<div class="small" style="margin-top:6px">'+mp.map(m=>`${m.productCode} — ${m.productDescription||'(no description)'} · ₹${Math.round(m.netAmount).toLocaleString('en-IN')}`).join('<br>')+'</div>' : '';
     document.getElementById('previewBox').style.display = 'block';
-    st.className='status show ok'; st.textContent = 'Parsed successfully. Review the summary below, then push.';
+    st.className='status show ok'; st.textContent = `Parsed. Other-division rows excluded: ${otherDivCount} (₹${Math.round(otherDivNet).toLocaleString('en-IN')}). Products missing from Product List but sold as OTC: ${mp.length}. Review, then push.`;
   }catch(e){
     st.className='status show err'; st.textContent = 'Error: ' + e.message;
     console.error(e);
@@ -531,6 +550,15 @@ function downloadUnmapped(){
   XLSX.writeFile(wb, `unmapped_${PARSED_MONTH.key}.xlsx`);
 }
 window.downloadUnmapped = downloadUnmapped;
+
+function downloadMissingProducts(){
+  if(!PARSED_MONTH || !PARSED_MONTH.missingProducts.length){ alert('No missing products in this file.'); return; }
+  const ws = XLSX.utils.json_to_sheet(PARSED_MONTH.missingProducts);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Missing in Product List');
+  XLSX.writeFile(wb, `missing_products_${PARSED_MONTH.key}.xlsx`);
+}
+window.downloadMissingProducts = downloadMissingProducts;
 
 async function loadMonthsList(){
   const body = document.getElementById('monthsBody');
